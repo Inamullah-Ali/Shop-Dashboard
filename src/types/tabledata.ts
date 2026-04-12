@@ -1,12 +1,41 @@
-export type DataType = {
+export type PackageDuration = string;
+
+export type IShop = {
   id: number;
+  createdAt?: string;
+  paymentStatus?: "Received" | "Not Received";
+  paymentDate?: string;
+  selectedPlanId?: number;
+  selectedPlanName?: string;
+  selectedPlanPrice?: number;
   shopName: string;
   ownerName: string;
-  phoneNumber: string;
+  phoneNumber: any;
   shopAddress: string;
   city: string;
   shopType: string;
   email: string;
-  role: string;
   status: string;
+  packageDuration?: PackageDuration;
+  image?: string;
 };
+
+export interface ShopState {
+  shops: IShop[];
+  setShops: (shops: IShop[]) => void;
+  addShop: (shop: Omit<IShop, "id">) => void;
+  deleteShop: (id: number) => void;
+  editShop: (id: number, updatedShop: Partial<IShop>) => void;
+}
+
+export interface EditShop {
+  id: number;
+  img: string;
+  heading: string;
+  price: string;
+}
+
+export interface DeleteShop {
+  shopid: number;
+  shop: IShop;
+}

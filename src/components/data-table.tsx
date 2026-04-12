@@ -28,6 +28,7 @@ import {
   useReactTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type FilterFn,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
@@ -39,21 +40,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -77,22 +68,25 @@ import {
   GripVerticalIcon,
   CircleCheckIcon,
   LoaderIcon,
-  EllipsisVerticalIcon,
-  Columns3Icon,
-  ChevronDownIcon,
   ChevronsLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronsRightIcon,
-  TrashIcon,
+  SearchIcon,
+  XIcon,
 } from "lucide-react";
-import type { DataType } from "@/types/tabledata";
 import { AddDialogue } from "./Dialogue/adddialogue";
-import { EditDialogue } from "./Dialogue/editdialogue";
 import { DeleteDialogue } from "./Dialogue/deletedialogue";
+import { useShopStore } from "@/store/shop-store";
+import { EditDialogue } from "./Dialogue/editdialogue";
+import { getDerivedShopStatus, isShopActiveStatus } from "@/lib/package-utils";
 
 export const schema = z.object({
   id: z.number(),
+  createdAt: z.string().optional(),
+  selectedPlanId: z.number().optional(),
+  selectedPlanName: z.string().optional(),
+  selectedPlanPrice: z.number().optional(),
   shopName: z.string(),
   ownerName: z.string(),
   phoneNumber: z.string(),
@@ -100,11 +94,11 @@ export const schema = z.object({
   city: z.string(),
   shopType: z.string(),
   email: z.string(),
-  role: z.string(),
   status: z.string(),
+  packageDuration: z.string().optional(),
+  image: z.string().optional(),
 });
 
-// Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
     id,
@@ -124,25 +118,16 @@ function DragHandle({ id }: { id: number }) {
   );
 }
 
-const Data: DataType[] = [
-  {
-    id: 1,
-    shopName: "Bismillah Shop",
-    ownerName: "Ali Khan",
-    phoneNumber: "03001234567",
-    shopAddress: "Main Bazaar",
-    city: "Karachi",
-    shopType: "Grocery",
-    email: "shop@gmail.com",
-    role: "Admin",
-    status: "Active",
-  },
-];
-
 export function DataTable() {
-  const [data, setData] = React.useState(() => Data);
+  const { shops, setShops } = useShopStore();
+  const [activeTab, setActiveTab] = React.useState("outline");
+  const [testDate, setTestDate] = React.useState("");
+  const [searchOpen, setSearchOpen] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [selectedItem, setSelectedItem] = React.useState<z.infer<typeof schema> | null>(null);
+  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [selectedItem, setSelectedItem] = React.useState<z.infer<
+    typeof schema
+  > | null>(null);
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -162,13 +147,89 @@ export function DataTable() {
   );
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data],
+    () => shops?.map(({ id }) => id) || [],
+    [shops],
   );
+
+  const searchValue = globalFilter.trim().toLowerCase();
+
+  const referenceDate = React.useMemo(() => {
+    if (!testDate) {
+      return new Date();
+    }
+
+    const parsed = new Date(`${testDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date();
+    }
+
+    return parsed;
+  }, [testDate]);
+
+  const matchesSearch = React.useCallback(
+    (shop: z.infer<typeof schema>) => {
+      if (!searchValue) {
+        return true;
+      }
+
+      return (
+        shop.shopName.toLowerCase().includes(searchValue) ||
+        shop.ownerName.toLowerCase().includes(searchValue)
+      );
+    },
+    [searchValue],
+  );
+
+  const activeShops = React.useMemo(
+    () =>
+      shops
+        .filter((shop) => isShopActiveStatus(shop, referenceDate))
+        .filter(matchesSearch),
+    [shops, matchesSearch, referenceDate],
+  );
+
+  const inactiveShops = React.useMemo(
+    () =>
+      shops
+        .filter((shop) => !isShopActiveStatus(shop, referenceDate))
+        .filter(matchesSearch),
+    [shops, matchesSearch, referenceDate],
+  );
+
+  const shopOwnerSearchFilter: FilterFn<z.infer<typeof schema>> = (
+    row,
+    _columnId,
+    filterValue,
+  ) => {
+    const query = String(filterValue ?? "").trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+
+    return (
+      row.original.shopName.toLowerCase().includes(query) ||
+      row.original.ownerName.toLowerCase().includes(query)
+    );
+  };
 
   const handleOpen = React.useCallback((item: z.infer<typeof schema>) => {
     setSelectedItem(item);
     setOpen(true);
+  }, []);
+
+  const formatAddedDate = React.useCallback((shop: z.infer<typeof schema>) => {
+    const rawDate = shop.createdAt ?? new Date(shop.id).toISOString();
+    const parsed = new Date(rawDate);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return "-";
+    }
+
+    return parsed.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   }, []);
 
   const columns = React.useMemo<ColumnDef<z.infer<typeof schema>>[]>(
@@ -210,7 +271,7 @@ export function DataTable() {
         cell: ({ row }) => (
           <Button
             variant="link"
-            className="w-fit px-0 text-left text-foreground cursor-pointer"
+            className="px-0 text-left text-foreground cursor-pointer max-w-50 truncate"
             onClick={() => handleOpen(row.original)}
           >
             {row.original.shopName}
@@ -220,18 +281,30 @@ export function DataTable() {
       {
         accessorKey: "ownerName",
         header: "Owner Name",
+        cell: ({ row }) => (
+          <div className="max-w-40 truncate">{row.original.ownerName}</div>
+        ),
       },
       {
         accessorKey: "phoneNumber",
         header: "Phone Number",
+        cell: ({ row }) => (
+          <div className="max-w-30 truncate">{row.original.phoneNumber}</div>
+        ),
       },
       {
-        accessorKey: "shopType",
-        header: "Shop Type",
+        id: "addedDate",
+        header: "Date",
+        cell: ({ row }) => (
+          <div className="max-w-30 truncate">{formatAddedDate(row.original)}</div>
+        ),
       },
       {
         accessorKey: "email",
         header: "Email",
+        cell: ({ row }) => (
+          <div className="max-w-50 truncate">{row.original.email}</div>
+        ),
       },
       {
         accessorKey: "city",
@@ -240,34 +313,36 @@ export function DataTable() {
       {
         accessorKey: "status",
         header: "Account Status",
-        cell: ({ row }) => (
+        cell: ({ row }) => {
+          const status = getDerivedShopStatus(row.original, referenceDate)
+          return (
           <Badge variant="outline">
-            {row.original.status === "Active" ? (
+            {status === "Active" || status === "Active (Free)" ? (
               <CircleCheckIcon className="text-green-500" />
             ) : (
               <LoaderIcon />
             )}
-            {row.original.status}
+            {status}
           </Badge>
+          )
+        },
+      },
+      {
+        id: "actions",
+        size: 60,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1 justify-end">
+            <EditDialogue rowData={row.original} />
+            <DeleteDialogue rowData={row.original} />
+          </div>
         ),
       },
-{
-  id: "actions",
-  size: 60,
-  cell: () => (
-    <div className="flex items-center gap-1 justify-end">
-      <EditDialogue />
-      <DeleteDialogue />
-
-    </div>
-  ),
-}
     ],
-    [handleOpen],
+    [formatAddedDate, handleOpen, referenceDate],
   );
 
   const table = useReactTable({
-    data,
+    data: shops,
     columns,
     state: {
       sorting,
@@ -275,6 +350,7 @@ export function DataTable() {
       rowSelection,
       columnFilters,
       pagination,
+      globalFilter,
     },
     getRowId: (row) => row.id.toString(),
     enableRowSelection: true,
@@ -283,6 +359,8 @@ export function DataTable() {
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: shopOwnerSearchFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -294,25 +372,201 @@ export function DataTable() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id);
-        const newIndex = dataIds.indexOf(over.id);
-        return arrayMove(data, oldIndex, newIndex);
-      });
+      const oldIndex = dataIds.indexOf(active.id);
+      const newIndex = dataIds.indexOf(over.id);
+      const reorderedShops = arrayMove(shops, oldIndex, newIndex);
+      setShops(reorderedShops);
     }
   }
+
+  const renderFilteredTable = (filteredShops: z.infer<typeof schema>[]) => {
+    const filteredIds = filteredShops.map((shop) => shop.id.toString());
+    const filteredDndIds = filteredShops.map((shop) => shop.id);
+    const allFilteredSelected =
+      filteredIds.length > 0 &&
+      filteredIds.every((id) => Boolean((rowSelection as Record<string, boolean>)[id]));
+    const someFilteredSelected =
+      !allFilteredSelected &&
+      filteredIds.some((id) => Boolean((rowSelection as Record<string, boolean>)[id]));
+
+    const toggleAllFilteredRows = (checked: boolean) => {
+      setRowSelection((prev) => {
+        const next = { ...(prev as Record<string, boolean>) };
+        filteredIds.forEach((id) => {
+          if (checked) {
+            next[id] = true;
+          } else {
+            delete next[id];
+          }
+        });
+        return next;
+      });
+    };
+
+    const handleFilteredDragEnd = (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!active || !over || active.id === over.id) {
+        return;
+      }
+
+      const oldIndex = filteredDndIds.indexOf(active.id as number);
+      const newIndex = filteredDndIds.indexOf(over.id as number);
+      if (oldIndex < 0 || newIndex < 0) {
+        return;
+      }
+
+      const reorderedFilteredShops = arrayMove(filteredShops, oldIndex, newIndex);
+      const filteredSet = new Set(filteredShops.map((shop) => shop.id));
+      let pointer = 0;
+
+      const merged = shops.map((shop) => {
+        if (!filteredSet.has(shop.id)) {
+          return shop;
+        }
+        const nextShop = reorderedFilteredShops[pointer];
+        pointer += 1;
+        return nextShop;
+      });
+
+      setShops(merged);
+    };
+
+    return (
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <DndContext
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis]}
+          onDragEnd={handleFilteredDragEnd}
+          sensors={sensors}
+        >
+          <Table className="w-full min-w-275 [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
+            <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableRow>
+                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-10">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={
+                        allFilteredSelected ||
+                        (someFilteredSelected && "indeterminate")
+                      }
+                      onCheckedChange={(value) =>
+                        toggleAllFilteredRows(Boolean(value))
+                      }
+                    />
+                  </div>
+                </TableHead>
+                <TableHead>Shop Name</TableHead>
+                <TableHead>Owner Name</TableHead>
+                <TableHead>Phone Number</TableHead>
+                <TableHead>Added Date</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead>Account Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredShops.length ? (
+                <SortableContext
+                  items={filteredDndIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {filteredShops.map((shop) => (
+                    <TableRow key={shop.id}>
+                      <TableCell>
+                        <DragHandle id={shop.id} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={Boolean(
+                              (rowSelection as Record<string, boolean>)[
+                                shop.id.toString()
+                              ],
+                            )}
+                            onCheckedChange={(value) => {
+                              setRowSelection((prev) => {
+                                const next = {
+                                  ...(prev as Record<string, boolean>),
+                                };
+                                if (value) {
+                                  next[shop.id.toString()] = true;
+                                } else {
+                                  delete next[shop.id.toString()];
+                                }
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="link"
+                          className="w-fit px-0 text-left text-foreground cursor-pointer"
+                          onClick={() => handleOpen(shop)}
+                        >
+                          {shop.shopName}
+                        </Button>
+                      </TableCell>
+                      <TableCell>{shop.ownerName}</TableCell>
+                      <TableCell>{shop.phoneNumber}</TableCell>
+                      <TableCell>{formatAddedDate(shop)}</TableCell>
+                      <TableCell>
+                        <div className="max-w-50 truncate">{shop.email}</div>
+                      </TableCell>
+                      <TableCell>{shop.city}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const status = getDerivedShopStatus(shop, referenceDate)
+                          return (
+                        <Badge variant="outline">
+                          {status === "Active" || status === "Active (Free)" ? (
+                            <CircleCheckIcon className="text-green-500" />
+                          ) : (
+                            <LoaderIcon />
+                          )}
+                          {status}
+                        </Badge>
+                          )
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 justify-end">
+                          <EditDialogue rowData={shop} />
+                          <DeleteDialogue rowData={shop} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </SortableContext>
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={10} className="h-24 text-center">
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DndContext>
+      </div>
+    );
+  };
 
   return (
     <>
       <Tabs
-        defaultValue="outline"
+        value={activeTab}
+        onValueChange={setActiveTab}
         className="w-full flex-col justify-start gap-6"
       >
-        <div className="flex items-center justify-between px-4 lg:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 lg:px-6">
           <Label htmlFor="view-selector" className="sr-only">
             View
           </Label>
-          <Select defaultValue="outline">
+          <Select value={activeTab} onValueChange={setActiveTab}>
             <SelectTrigger
               className="flex w-fit @4xl/main:hidden"
               size="sm"
@@ -322,58 +576,61 @@ export function DataTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="outline">Outline</SelectItem>
+                <SelectItem value="outline">All</SelectItem>
                 <SelectItem value="past-performance">
-                  Past Performance
+                  Paid Shop
                 </SelectItem>
-                <SelectItem value="key-personnel">Key Personnel</SelectItem>
-                <SelectItem value="focus-documents">Focus Documents</SelectItem>
+                <SelectItem value="key-personnel">Unpaid Shop</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
           <TabsList className="hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1 @4xl/main:flex">
-            <TabsTrigger value="outline">All</TabsTrigger>
-            <TabsTrigger value="past-performance">
-              Paid Shop <Badge variant="secondary">3</Badge>
+            <TabsTrigger className="cursor-pointer" value="outline">All</TabsTrigger>
+            <TabsTrigger className="cursor-pointer" value="past-performance">
+              Paid Shop <Badge variant="secondary">{activeShops.length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="key-personnel">
-              Unpaid Shop <Badge variant="secondary">2</Badge>
+            <TabsTrigger className="cursor-pointer" value="key-personnel">
+              Unpaid Shop <Badge variant="secondary">{inactiveShops.length}</Badge>
             </TabsTrigger>
-            {/* <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger> */}
           </TabsList>
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Columns3Icon data-icon="inline-start" />
-                  Columns
-                  <ChevronDownIcon data-icon="inline-end" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
-                {table
-                  .getAllColumns()
-                  .filter(
-                    (column) =>
-                      typeof column.accessorFn !== "undefined" &&
-                      column.getCanHide(),
-                  )
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Test Date</span>
+              <Input
+                type="date"
+                value={testDate}
+                onChange={(e) => setTestDate(e.target.value)}
+                className="h-9 w-40"
+              />
+            </div>
+            <div className="flex items-center">
+              <Button
+                className="cursor-pointer"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (searchOpen) {
+                    setGlobalFilter("");
+                  }
+                  setSearchOpen((prev) => !prev);
+                }}
+                aria-label="Search shops"
+              >
+                {searchOpen ? <XIcon className="size-4" /> : <SearchIcon className="size-4" />}
+              </Button>
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  searchOpen ? "ml-2 w-52 opacity-100" : "w-0 opacity-0"
+                }`}
+              >
+                <Input
+                  value={globalFilter}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                  placeholder="Search shops..."
+                   className="h-9 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
+                />
+              </div>
+            </div>
 
             <AddDialogue />
           </div>
@@ -382,7 +639,7 @@ export function DataTable() {
           value="outline"
           className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
         >
-          <div className="overflow-hidden rounded-lg border-gray-200 border">
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
             <DndContext
               collisionDetection={closestCenter}
               modifiers={[restrictToVerticalAxis]}
@@ -390,8 +647,7 @@ export function DataTable() {
               sensors={sensors}
               id={sortableId}
             >
-              <Table className="table-fixed w-full">
-                {/* HEADER */}
+              <Table className="w-full min-w-275 [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
                 <TableHeader className="sticky top-0 z-10 bg-muted">
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableRow key={headerGroup.id}>
@@ -412,8 +668,6 @@ export function DataTable() {
                     </TableRow>
                   ))}
                 </TableHeader>
-
-                {/* BODY */}
                 <TableBody>
                   {table.getRowModel().rows?.length ? (
                     <SortableContext
@@ -534,13 +788,13 @@ export function DataTable() {
           value="past-performance"
           className="flex flex-col px-4 lg:px-6"
         >
-          <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+          {renderFilteredTable(activeShops)}
         </TabsContent>
         <TabsContent
           value="key-personnel"
           className="flex flex-col px-4 lg:px-6"
         >
-          <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+          {renderFilteredTable(inactiveShops)}
         </TabsContent>
         <TabsContent
           value="focus-documents"
@@ -551,7 +805,12 @@ export function DataTable() {
       </Tabs>
 
       {selectedItem && (
-        <ShopDrawer item={selectedItem} open={open} onOpenChange={setOpen} />
+        <ShopDrawer
+          item={selectedItem}
+          open={open}
+          onOpenChange={setOpen}
+          referenceDate={referenceDate}
+        />
       )}
     </>
   );
@@ -561,105 +820,110 @@ function ShopDrawer({
   item,
   open,
   onOpenChange,
+  referenceDate,
 }: {
   item: z.infer<typeof schema>;
   open: boolean;
   onOpenChange: (value: boolean) => void;
+  referenceDate: Date;
 }) {
   const isMobile = useIsMobile();
+  const status = getDerivedShopStatus(item, referenceDate);
+  const isActive = status === "Active" || status === "Active (Free)";
 
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      direction={isMobile ? "bottom" : "right"}
-    >
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.shopName}</DrawerTitle>
-          <DrawerDescription>Complete shop details</DrawerDescription>
-        </DrawerHeader>
-
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          <form className="flex flex-col gap-4">
-            {/* Shop Name */}
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="shopName">Shop Name</Label>
-              <Input id="shopName" defaultValue={item.shopName} />
-            </div>
-
-            {/* Owner + Phone */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="ownerName">Owner Name</Label>
-                <Input id="ownerName" defaultValue={item.ownerName} />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                <Input id="phoneNumber" defaultValue={item.phoneNumber} />
-              </div>
-            </div>
-
-            {/* Address */}
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="shopAddress">Shop Address</Label>
-              <Input id="shopAddress" defaultValue={item.shopAddress} />
-            </div>
-
-            {/* City + Type */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" defaultValue={item.city} />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="shopType">Shop Type</Label>
-                <Input id="shopType" defaultValue={item.shopType} />
-              </div>
-            </div>
-
-            {/* Email + Role */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" defaultValue={item.email} />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="role">Role</Label>
-                <Input id="role" defaultValue={item.role} />
-              </div>
-            </div>
-
-            {/* Status */}
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="status">Account Status</Label>
-              <Select defaultValue={item.status}>
-                <SelectTrigger id="status" className="w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
+<Drawer
+  open={open}
+  onOpenChange={onOpenChange}
+  direction={isMobile ? "bottom" : "right"}
+>
+  <DrawerContent className="rounded-t-2xl sm:rounded-none">
+    <DrawerHeader className="gap-1 border-b pb-4">
+      <DrawerTitle className="text-xl font-semibold">
+        {item.shopName}
+      </DrawerTitle>
+      <DrawerDescription className="text-muted-foreground">
+        Complete shop details
+      </DrawerDescription>
+    </DrawerHeader>
+    <div className="flex flex-col gap-5 overflow-y-auto px-5 pb-6 pt-4 text-sm">
+      {item.image && (
+        <div className="overflow-hidden rounded-xl border">
+          <img
+            src={item.image}
+            alt={`${item.shopName} image`}
+            className="h-48 w-full object-cover transition-transform duration-300 hover:scale-105"
+          />
         </div>
-
-        <DrawerFooter>
-          {/* <Button>Submit</Button> */}
-          <DrawerClose asChild>
-            <Button className="cursor-pointer" variant="outline">
-              Update
-            </Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+      )}
+      <div>
+        <span
+          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+            isActive
+              ? "bg-green-100 text-green-700"
+              : "bg-red-100 text-red-600"
+          }`}
+        >
+          {status}
+        </span>
+        {status === "Active (Free)" ? (
+          <span className="ml-2 inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+            Free
+          </span>
+        ) : null}
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            Plan
+          </Label>
+          <p className="font-medium">{item.selectedPlanName ?? item.packageDuration ?? "-"}</p>
+        </div>
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            Plan Price
+          </Label>
+          <p className="font-medium">Rs. {item.selectedPlanPrice ?? 0}</p>
+        </div>
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            Owner Name
+          </Label>
+          <p className="font-medium">{item.ownerName}</p>
+        </div>
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            Phone Number
+          </Label>
+          <p className="font-medium">{item.phoneNumber}</p>
+        </div>
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            City
+          </Label>
+          <p className="font-medium">{item.city}</p>
+        </div>
+        <div className="space-y-1 rounded-lg border p-3">
+          <Label className="text-xs text-muted-foreground">
+            Shop Type
+          </Label>
+          <p className="font-medium">{item.shopType}</p>
+        </div>
+      </div>
+      <div className="rounded-lg border p-3 space-y-1">
+        <Label className="text-xs text-muted-foreground">
+          Shop Address
+        </Label>
+        <p className="font-medium">{item.shopAddress}</p>
+      </div>
+      <div className="rounded-lg border p-3 space-y-1">
+        <Label className="text-xs text-muted-foreground">
+          Email
+        </Label>
+        <p className="break-all font-medium">{item.email}</p>
+      </div>
+    </div>
+  </DrawerContent>
+</Drawer>
   );
 }

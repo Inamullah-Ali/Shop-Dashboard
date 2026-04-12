@@ -12,7 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, Settings2Icon, CircleHelpIcon, SearchIcon, CommandIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, CreditCardIcon, FileBarChart2Icon, WalletIcon, Settings2Icon, CircleHelpIcon, SearchIcon, CommandIcon } from "lucide-react"
 import { ThemeSwitch } from "./themeswitcher"
 
 const data = {
@@ -47,18 +47,26 @@ const data = {
       ),
     },
     {
-      title: "Projects",
-      url: "/projects",
+      title: "Payment",
+      url: "/payment",
       icon: (
-        <FolderIcon
+        <CreditCardIcon
         />
       ),
     },
     {
-      title: "Team",
-      url: "/team",
+      title: "Plans",
+      url: "/plans",
       icon: (
-        <UsersIcon
+        <WalletIcon
+        />
+      ),
+    },
+    {
+      title: "Reports",
+      url: "/reports",
+      icon: (
+        <FileBarChart2Icon
         />
       ),
     },

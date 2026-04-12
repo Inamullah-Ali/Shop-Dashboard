@@ -3,109 +3,123 @@
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
-  CardAction,
-  CardDescription,
-  CardFooter,
+  CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card"
 import { TrendingUpIcon, TrendingDownIcon } from "lucide-react"
+import { useShopStore } from "@/store/shop-store"
+import { useMemo } from "react"
+import { isShopActiveStatus } from "@/lib/package-utils"
+import { getPriceFromPlans, usePlanStore } from "@/store/addPlanStore"
 
 export function SectionCards() {
+  const { shops } = useShopStore()
+  const { plans } = usePlanStore()
+
+  const stats = useMemo(() => {
+    const totalShops = shops.length
+    const activeShops = shops.filter(
+      (shop) => isShopActiveStatus(shop)
+    ).length
+    const inactiveShops = shops.filter(
+      (shop) => !isShopActiveStatus(shop)
+    ).length
+    const getShopAmount = (shop: (typeof shops)[number]) =>
+      typeof shop.selectedPlanPrice === "number" && shop.selectedPlanPrice > 0
+        ? shop.selectedPlanPrice
+        : getPriceFromPlans(plans, shop.packageDuration)
+
+    const totalRevenue = shops.reduce(
+      (sum, shop) =>
+        shop.paymentStatus === "Received"
+          ? sum + getShopAmount(shop)
+          : sum,
+      0,
+    )
+
+    return {
+      totalShops,
+      activeShops,
+      inactiveShops,
+      totalRevenue,
+      totalPercentage: totalShops > 0 ? "100.0" : "0.0",
+      activePercentage:
+        totalShops > 0 ? ((activeShops / totalShops) * 100).toFixed(1) : "0.0",
+      inactivePercentage:
+        totalShops > 0 ? ((inactiveShops / totalShops) * 100).toFixed(1) : "0.0",
+    }
+  }, [plans, shops])
+
+  const cardClass =
+    "rounded-2xl bg-white/70 shadow-sm backdrop-blur-md transition hover:shadow-md"
+
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
-      <Card className="@container/card">
+    <div className="grid grid-cols-1 gap-5 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <Card className={cardClass}>
+        <CardHeader>
+          <CardDescription>Total Shops</CardDescription>
+          <CardTitle className="text-3xl font-semibold tabular-nums">
+            {stats.totalShops}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Badge className="gap-1 bg-blue-50 text-blue-600">
+            <TrendingUpIcon className="size-4" />
+            {stats.totalPercentage}%
+          </Badge>
+        </CardContent>
+      </Card>
+
+      {/* Active Shops */}
+      <Card className={cardClass}>
+        <CardHeader>
+          <CardDescription>Active Shops</CardDescription>
+          <CardTitle className="text-3xl font-semibold tabular-nums text-green-600">
+            {stats.activeShops}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Badge className="gap-1 bg-green-50 text-green-600">
+            <TrendingUpIcon className="size-4" />
+            {stats.activePercentage}%
+          </Badge>
+        </CardContent>
+      </Card>
+
+      {/* Inactive Shops */}
+      <Card className={cardClass}>
+        <CardHeader>
+          <CardDescription>Inactive Shops</CardDescription>
+          <CardTitle className="text-3xl font-bold tabular-nums text-red-500">
+            {stats.inactiveShops}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Badge className="gap-1 bg-red-50 text-red-500">
+            <TrendingDownIcon className="size-4" />
+            {stats.inactivePercentage}%
+          </Badge>
+        </CardContent>
+      </Card>
+
+      {/* Revenue */}
+      <Card className={cardClass}>
         <CardHeader>
           <CardDescription>Total Revenue</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
+          <CardTitle className="text-3xl font-semibold tabular-nums">
+            Rs. {stats.totalRevenue}
           </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon
-              />
-              +12.5%
-            </Badge>
-          </CardAction>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month{" "}
+        <CardContent>
+          <Badge className="gap-1 bg-purple-50 text-purple-600">
             <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Visitors for the last 6 months
-          </div>
-        </CardFooter>
+            Received
+          </Badge>
+        </CardContent>
       </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>New Customers</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,234
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingDownIcon
-              />
-              -20%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period{" "}
-            <TrendingDownIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Active Accounts</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            45,678
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon
-              />
-              +12.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention{" "}
-            <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            4.5%
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon
-              />
-              +4.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance increase{" "}
-            <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
-        </CardFooter>
-      </Card>
+
     </div>
   )
 }
