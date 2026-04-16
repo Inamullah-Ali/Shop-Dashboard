@@ -23,30 +23,15 @@ import { Label } from "@/components/ui/label";
 import { PencilIcon } from "lucide-react";
 
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useShopStore } from "@/store/shop-store";
 import type { PackageDuration } from "@/types/tabledata";
 import { usePlanStore } from "@/store/addPlanStore";
-
-/* ✅ Schema */
-const schema = z.object({
-  shopName: z.string().min(1),
-  ownerName: z.string().min(1),
-  phoneNumber: z.string().min(1),
-  shopAddress: z.string().min(1),
-  city: z.string().min(1),
-  shopType: z.string().min(1),
-  email: z.string().email(),
-  selectedPlanId: z.number().min(1, "Plan is required"),
-  status: z.enum(["Active", "Inactive"]),
-});
-
-type FormData = z.infer<typeof schema>;
+import { editShopSchema, type EditShopFormData } from "./shop-dialog-schema";
 
 type Props = {
-  rowData?: Omit<FormData, "selectedPlanId" | "status"> & {
+  rowData?: Omit<EditShopFormData, "selectedPlanId" | "status"> & {
     id: number;
     image?: string;
     packageDuration?: PackageDuration;
@@ -90,8 +75,8 @@ export function EditDialogue({ rowData, trigger }: Props) {
     reset,
     control,
     formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
+  } = useForm<EditShopFormData>({
+    resolver: zodResolver(editShopSchema),
     defaultValues: {
       ...rowData,
       selectedPlanId: getDefaultPlanId(),
@@ -116,7 +101,7 @@ export function EditDialogue({ rowData, trigger }: Props) {
       reader.readAsDataURL(file);
     });
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: EditShopFormData) => {
     const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
     if (!selectedPlan) {
       return;

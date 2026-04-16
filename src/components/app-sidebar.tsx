@@ -12,15 +12,35 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, CreditCardIcon, FileBarChart2Icon, WalletIcon, Settings2Icon, CircleHelpIcon, SearchIcon, CommandIcon } from "lucide-react"
+import {
+  LayoutDashboardIcon,
+  ListIcon,
+  ChartBarIcon,
+  CreditCardIcon,
+  FileBarChart2Icon,
+  WalletIcon,
+  Settings2Icon,
+  CircleHelpIcon,
+  SearchIcon,
+  CommandIcon,
+  BoxesIcon,
+  UsersIcon,
+  ShoppingCartIcon,
+  HandCoinsIcon,
+  ReceiptTextIcon,
+} from "lucide-react"
 import { ThemeSwitch } from "./themeswitcher"
+import { useAuth } from "./login/authContext"
+import type { UserRole } from "@/types/tabledata"
+
+type NavItem = {
+  title: string
+  url: string
+  icon: React.ReactNode
+  roles: UserRole[]
+}
 
 const data = {
-  user: {
-    name: "shop",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Dashboard",
@@ -29,6 +49,7 @@ const data = {
         <LayoutDashboardIcon
         />
       ),
+      roles: ["admin", "shopAdmin"] as UserRole[],
     },
     {
       title: "Shops",
@@ -37,6 +58,7 @@ const data = {
         <ListIcon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
     {
       title: "Products",
@@ -45,6 +67,37 @@ const data = {
         <ChartBarIcon
         />
       ),
+      roles: ["admin", "shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Inventory",
+      url: "/inventory",
+      icon: <BoxesIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Sales",
+      url: "/sales",
+      icon: <ShoppingCartIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Customers",
+      url: "/customers",
+      icon: <UsersIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Purchase",
+      url: "/purchase",
+      icon: <HandCoinsIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Expense",
+      url: "/expense",
+      icon: <ReceiptTextIcon />,
+      roles: ["shopAdmin"] as UserRole[],
     },
     {
       title: "Payment",
@@ -53,6 +106,7 @@ const data = {
         <CreditCardIcon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
     {
       title: "Plans",
@@ -61,6 +115,7 @@ const data = {
         <WalletIcon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
     {
       title: "Reports",
@@ -69,8 +124,9 @@ const data = {
         <FileBarChart2Icon
         />
       ),
+      roles: ["admin", "shopAdmin"] as UserRole[],
     },
-  ],
+  ] as NavItem[],
   navSecondary: [
     {
       title: "Settings",
@@ -79,6 +135,7 @@ const data = {
         <Settings2Icon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
     {
       title: "Get Help",
@@ -87,6 +144,7 @@ const data = {
         <CircleHelpIcon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
     {
       title: "Search",
@@ -95,11 +153,18 @@ const data = {
         <SearchIcon
         />
       ),
+      roles: ["admin"] as UserRole[],
     },
-  ],
+  ] as NavItem[],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth()
+  const currentRole: UserRole = user?.role === "admin" ? "admin" : "shopAdmin"
+
+  const navMain = data.navMain.filter((item) => item.roles.includes(currentRole))
+  const navSecondary = data.navSecondary.filter((item) => item.roles.includes(currentRole))
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -121,11 +186,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navMain} />
+        {navSecondary.length ? (
+          <NavSecondary items={navSecondary} className="mt-auto" />
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser
+          user={{
+            name: user?.name ?? "User",
+            email: user?.email ?? "",
+            avatar: user?.avatar ?? "/avatars/shadcn.jpg",
+          }}
+        />
       </SidebarFooter>
     </Sidebar>
   )

@@ -1,5 +1,7 @@
 export type PackageDuration = string;
 
+export type UserRole = "admin" | "shopAdmin";
+
 export type IShop = {
   id: number;
   createdAt?: string;
@@ -15,6 +17,8 @@ export type IShop = {
   city: string;
   shopType: string;
   email: string;
+  password?: string;
+  role?: UserRole;
   status: string;
   packageDuration?: PackageDuration;
   image?: string;

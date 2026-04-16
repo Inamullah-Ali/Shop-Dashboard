@@ -10,6 +10,7 @@ const normalizeShop = (shop: IShop): IShop => {
   return {
     ...shop,
     createdAt,
+    role: shop.role === "admin" ? "admin" : "shopAdmin",
     paymentStatus: shop.paymentStatus ?? "Not Received",
     paymentDate: shop.paymentDate,
     selectedPlanId: shop.selectedPlanId,

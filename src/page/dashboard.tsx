@@ -1,9 +1,17 @@
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { DataTable } from "@/components/data-table";
 import { SectionCards } from "@/components/section-cards";
+import { useAuth } from "@/components/login/authContext";
+import { ShopDashboard } from "@/components/shop-dashboard";
 import { ShopAlerts } from "@/components/shop-alerts";
 
 export default function Dashboard() {
+    const { user } = useAuth()
+
+    if (user?.role === "shopAdmin") {
+      return <ShopDashboard />
+    }
+
     return (
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">

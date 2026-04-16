@@ -1,20 +1,3 @@
-import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -26,79 +9,26 @@ import {
 import { usePlanStore } from "@/store/addPlanStore";
 import { formatShortDate } from "@/lib/billing-utils";
 import { useShopStore } from "@/store/shop-store";
-
-const planSchema = z.object({
-  planName: z.string().min(1, "Plan name is required"),
-  durationMonths: z.number().int().min(1, "Duration must be at least 1 month"),
-  price: z.number().min(1, "Price must be greater than 0"),
-});
-
-type PlanFormData = z.infer<typeof planSchema>;
+import { formatPlanDurationLabel } from "@/lib/plan-utils";
+import { AddPlanDialogue } from "@/components/Dialogue/add-plan-dialogue";
+import { EditPlanDialogue } from "@/components/Dialogue/edit-plan-dialogue";
+import type { PlanFormData } from "@/components/Dialogue/plan-form-schema";
+import { DeletePlan } from "@/components/Dialogue/deleteplan";
 
 export default function Plans() {
-  const [open, setOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingPlanId, setEditingPlanId] = useState<number | null>(null);
-  const { plans, addPlan, updatePlan, deletePlan } = usePlanStore();
+  const { plans, addPlan, updatePlan } = usePlanStore();
   const { editShop, shops } = useShopStore();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<PlanFormData>({
-    resolver: zodResolver(planSchema),
-    defaultValues: {
-      durationMonths: 1,
-      price: 0,
-    },
-  });
-
-  const onSubmit = (values: PlanFormData) => {
+  const onAddPlan = (values: PlanFormData) => {
     addPlan(values);
-    reset({
-      planName: "",
-      durationMonths: 1,
-      price: 0,
-    });
-    setOpen(false);
   };
 
-  const editForm = useForm<PlanFormData>({
-    resolver: zodResolver(planSchema),
-    defaultValues: {
-      planName: "",
-      durationMonths: 1,
-      price: 0,
-    },
-  });
+  const onUpdatePlan = (planId: number, values: PlanFormData) => {
+    updatePlan(planId, values);
 
-  const openEditDialog = (planId: number) => {
-    const plan = plans.find((item) => item.id === planId);
-    if (!plan) {
-      return;
-    }
-
-    setEditingPlanId(planId);
-    editForm.reset({
-      planName: plan.planName,
-      durationMonths: plan.durationMonths,
-      price: plan.price,
-    });
-    setEditOpen(true);
-  };
-
-  const onEditSubmit = (values: PlanFormData) => {
-    if (editingPlanId === null) {
-      return;
-    }
-
-    updatePlan(editingPlanId, values);
-
-    const updatedDurationLabel = `${values.durationMonths} month${values.durationMonths > 1 ? "s" : ""}`;
+    const updatedDurationLabel = formatPlanDurationLabel(values.planName, values.durationMonths);
     shops
-      .filter((shop) => shop.selectedPlanId === editingPlanId)
+      .filter((shop) => shop.selectedPlanId === planId)
       .forEach((shop) => {
         editShop(shop.id, {
           selectedPlanName: `${values.durationMonths} ${values.planName}`,
@@ -106,9 +36,6 @@ export default function Plans() {
           packageDuration: updatedDurationLabel,
         });
       });
-
-    setEditingPlanId(null);
-    setEditOpen(false);
   };
 
   return (
@@ -122,110 +49,12 @@ export default function Plans() {
                 First month is free for all newly added shops. Billing starts from next month.
               </p>
             </div>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <PlusIcon className="size-4" />
-                  Add Plan
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <DialogHeader>
-                    <DialogTitle>Add Plan</DialogTitle>
-                    <DialogDescription>
-                      Add a new plan or update an existing duration price.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="space-y-2">
-                    <Label>Plan Name</Label>
-                    <Input {...register("planName")} placeholder="Monthly / Premium Monthly" />
-                    {errors.planName && (
-                      <p className="text-sm text-red-500">{errors.planName.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Duration (Months)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      {...register("durationMonths", { valueAsNumber: true })}
-                    />
-                    {errors.durationMonths && (
-                      <p className="text-sm text-red-500">{errors.durationMonths.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Price (Rs.)</Label>
-                    <Input type="number" {...register("price", { valueAsNumber: true })} />
-                    {errors.price && (
-                      <p className="text-sm text-red-500">{errors.price.message}</p>
-                    )}
-                  </div>
-
-                  <DialogFooter>
-                    <Button type="submit">Save Plan</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogContent className="sm:max-w-md">
-                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                  <DialogHeader>
-                    <DialogTitle>Edit Plan</DialogTitle>
-                    <DialogDescription>
-                      Update the selected plan name, duration, or price.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="space-y-2">
-                    <Label>Plan Name</Label>
-                    <Input {...editForm.register("planName")} />
-                    {editForm.formState.errors.planName && (
-                      <p className="text-sm text-red-500">{editForm.formState.errors.planName.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Duration (Months)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      {...editForm.register("durationMonths", { valueAsNumber: true })}
-                    />
-                    {editForm.formState.errors.durationMonths && (
-                      <p className="text-sm text-red-500">{editForm.formState.errors.durationMonths.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Price (Rs.)</Label>
-                    <Input
-                      type="number"
-                      {...editForm.register("price", { valueAsNumber: true })}
-                    />
-                    {editForm.formState.errors.price && (
-                      <p className="text-sm text-red-500">{editForm.formState.errors.price.message}</p>
-                    )}
-                  </div>
-
-                  <DialogFooter>
-                    <Button type="submit">Update Plan</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <AddPlanDialogue onAddPlan={onAddPlan} />
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead>Plan Name</TableHead>
                   <TableHead>Duration</TableHead>
@@ -244,22 +73,8 @@ export default function Plans() {
                       <TableCell>{formatShortDate(plan.updatedAt)}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditDialog(plan.id)}
-                            aria-label="Edit plan"
-                          >
-                            <PencilIcon className="size-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deletePlan(plan.id)}
-                            aria-label="Delete plan"
-                          >
-                            <Trash2Icon className="size-4" />
-                          </Button>
+                          <EditPlanDialogue plan={plan} onUpdatePlan={onUpdatePlan} />
+                          <DeletePlan rowData={{ id: plan.id, shopName: plan.planName }} />
                         </div>
                       </TableCell>
                     </TableRow>

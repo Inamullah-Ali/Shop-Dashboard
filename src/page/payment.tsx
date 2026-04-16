@@ -9,8 +9,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useShopStore } from "@/store/shop-store";
-import { formatShortDate, getBillingStartDate, getFreeMonthEndDate } from "@/lib/billing-utils";
-import { getPriceFromPlans, usePlanStore } from "@/store/addPlanStore";
+import { formatShortDate, getBillingStartDate } from "@/lib/billing-utils";
+import { usePlanStore } from "@/store/addPlanStore";
+import { getPriceFromPlans } from "@/lib/plan-utils";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { IShop } from "@/types/tabledata";
@@ -142,16 +143,13 @@ export default function Payment() {
 
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead>Shop Name</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Added Date</TableHead>
-                  <TableHead>Free Ends</TableHead>
-                  <TableHead>Plan Starts</TableHead>
-                  <TableHead>Payment Date</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -181,23 +179,11 @@ export default function Payment() {
                         </Badge>
                       </TableCell>
                       <TableCell>{formatShortDate(shop.createdAt ?? shop.id)}</TableCell>
-                      <TableCell>{formatShortDate(getFreeMonthEndDate(shop))}</TableCell>
-                      <TableCell>{formatShortDate(billingStart)}</TableCell>
-                      <TableCell>{shop.paymentDate ? formatShortDate(shop.paymentDate) : "-"}</TableCell>
-                      <TableCell>Rs. {getShopAmount(shop)}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          {isFreeTrialActive ? (
-                            <>
-                              <Button size="sm" disabled>
-                                Received
-                              </Button>
-                              <Button size="sm" disabled variant="outline">
-                                Not Received
-                              </Button>
-                            </>
-                          ) : isPaidCycleActive ? (
-                            <Button size="sm" variant="secondary" onClick={() => printReceipt(shop.id)}>
+                      <TableCell className="text-right">Rs. {getShopAmount(shop)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          {isFreeTrialActive ? null : isPaidCycleActive ? (
+                            <Button className="cursor-pointer" size="sm" variant="secondary" onClick={() => printReceipt(shop.id)}>
                               Print
                             </Button>
                           ) : (
@@ -212,12 +198,8 @@ export default function Payment() {
                           )}
                         </div>
                         {isFreeTrialActive ? (
-                          <p className="mt-1 text-right text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             Free month active
-                          </p>
-                        ) : isPaidCycleActive ? (
-                          <p className="mt-1 text-right text-xs text-muted-foreground">
-                            Payment active
                           </p>
                         ) : null}
                       </TableCell>
@@ -228,7 +210,7 @@ export default function Payment() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell className="h-24 text-center" colSpan={9}>
+                    <TableCell className="h-24 text-center" colSpan={6}>
                       No shops found.
                     </TableCell>
                   </TableRow>

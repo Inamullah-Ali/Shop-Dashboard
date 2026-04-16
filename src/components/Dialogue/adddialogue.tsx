@@ -21,25 +21,11 @@ import { Label } from "@/components/ui/label";
 import { PlusIcon } from "lucide-react";
 
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useShopStore } from "@/store/shop-store";
 import { usePlanStore } from "@/store/addPlanStore";
-
-/* ✅ Validation Schema */
-const schema = z.object({
-  shopName: z.string().min(1, "Shop name is required"),
-  ownerName: z.string().min(1, "Owner name is required"),
-  phoneNumber: z.string().min(1, "Phone number is required"),
-  shopAddress: z.string().min(1, "Shop address is required"),
-  city: z.string().min(1, "City is required"),
-  shopType: z.string().min(1, "Shop type is required"),
-  email: z.string().email("Invalid email"),
-  selectedPlanId: z.number().min(1, "Plan is required"),
-});
-
-type FormData = z.infer<typeof schema>;
+import { addShopSchema, type AddShopFormData } from "./shop-dialog-schema";
 
 export function AddDialogue() {
   const [open, setOpen] = useState(false);
@@ -54,8 +40,8 @@ export function AddDialogue() {
     reset,
     control,
     formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
+  } = useForm<AddShopFormData>({
+    resolver: zodResolver(addShopSchema),
     defaultValues: {
       selectedPlanId: undefined,
     },
@@ -69,7 +55,7 @@ export function AddDialogue() {
       reader.readAsDataURL(file);
     });
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: AddShopFormData) => {
     const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
     if (!selectedPlan) {
       return;
@@ -81,6 +67,7 @@ export function AddDialogue() {
 
     addShop({
       ...data,
+      role: "shopAdmin",
       selectedPlanId: selectedPlan.id,
       selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
       selectedPlanPrice: selectedPlan.price,
@@ -205,33 +192,18 @@ export function AddDialogue() {
               )}
             </div>
 
+<div className="flex flex-row gap-4">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="shop-image">Shop Image (optional)</Label>
-              {preview && (
-                <img
-                  src={preview}
-                  alt="Preview"
-                  className="mt-2 h-24 w-24 object-cover rounded-md border"
-                />
-              )}
+              <Label>Password</Label>
               <Input
-              className="cursor-pointer"
-                id="shop-image"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setSelectedImage(file);
-                  if (file) {
-                    const imageUrl = URL.createObjectURL(file);
-                    setPreview(imageUrl);
-                  } else {
-                    setPreview(null);
-                  }
-                }}
+                type="text"
+                {...register("password")}
+                className="focus-visible:ring-2 focus-visible:ring-offset-0 rounded-sm"
               />
+              {errors.password && (
+                <p className="text-red-500 text-sm">{errors.password.message}</p>
+              )}
             </div>
-
             <div className="flex flex-col gap-1">
               <Label>Plan</Label>
               <Controller
@@ -265,6 +237,36 @@ export function AddDialogue() {
               {errors.selectedPlanId && (
                 <p className="text-red-500 text-sm">{errors.selectedPlanId.message}</p>
               )}
+            </div>
+</div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="shop-image">Shop Image (optional)</Label>
+              <div className="flex flex-row gap-1 items-end">
+              {preview && (
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="mt-2 h-20 w-24 object-cover rounded-md border"
+                />
+              )}
+              <Input
+              className="cursor-pointer"
+                id="shop-image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setSelectedImage(file);
+                  if (file) {
+                    const imageUrl = URL.createObjectURL(file);
+                    setPreview(imageUrl);
+                  } else {
+                    setPreview(null);
+                  }
+                }}
+              />
+              </div>
             </div>
           </div>
 

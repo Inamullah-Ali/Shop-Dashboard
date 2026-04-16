@@ -12,7 +12,8 @@ import { TrendingUpIcon, TrendingDownIcon } from "lucide-react"
 import { useShopStore } from "@/store/shop-store"
 import { useMemo } from "react"
 import { isShopActiveStatus } from "@/lib/package-utils"
-import { getPriceFromPlans, usePlanStore } from "@/store/addPlanStore"
+import { usePlanStore } from "@/store/addPlanStore"
+import { getPriceFromPlans } from "@/lib/plan-utils"
 
 export function SectionCards() {
   const { shops } = useShopStore()

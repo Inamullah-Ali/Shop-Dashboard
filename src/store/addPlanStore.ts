@@ -1,15 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { PackageDuration } from "@/types/tabledata";
+import type { PlanRow } from "@/types/plant";
+import { formatPlanDurationLabel } from "@/lib/plan-utils";
 
-export type PlanRow = {
-  id: number;
-  planName: string;
-  durationMonths: number;
-  durationLabel: PackageDuration;
-  price: number;
-  updatedAt: string;
-};
+
 
 type PlanState = {
   plans: PlanRow[];
@@ -19,14 +13,13 @@ type PlanState = {
   deletePlan: (id: number) => void;
 };
 
-export function getPriceFromPlans(
-  plans: PlanRow[],
-  duration: PackageDuration | undefined,
-) {
-  const effectiveDuration = duration ?? "1 month";
-  const matched = plans.find((plan) => plan.durationLabel === effectiveDuration);
-  return matched?.price ?? 0;
-}
+type PersistedPlanState = {
+  plans: Array<
+    PlanRow & {
+      duration?: string;
+    }
+  >;
+};
 
 export const usePlanStore = create<PlanState>()(
   persist(
@@ -38,7 +31,7 @@ export const usePlanStore = create<PlanState>()(
       addPlan: (plan) =>
         set((state) => {
           const now = new Date().toISOString();
-          const durationLabel = `${plan.durationMonths} month${plan.durationMonths > 1 ? "s" : ""}`;
+          const durationLabel = formatPlanDurationLabel(plan.planName, plan.durationMonths);
           const existing = state.plans.find(
             (row) =>
               row.planName.toLowerCase() === plan.planName.toLowerCase() &&
@@ -80,7 +73,7 @@ export const usePlanStore = create<PlanState>()(
       updatePlan: (id, plan) =>
         set((state) => {
           const now = new Date().toISOString();
-          const durationLabel = `${plan.durationMonths} month${plan.durationMonths > 1 ? "s" : ""}`;
+          const durationLabel = formatPlanDurationLabel(plan.planName, plan.durationMonths);
 
           return {
             plans: state.plans.map((row) =>
@@ -108,28 +101,22 @@ export const usePlanStore = create<PlanState>()(
       version: 3,
       storage: createJSONStorage(() => localStorage),
       migrate: (persistedState, version) => {
-        const state = persistedState as {
-          plans?: Array<
-            PlanRow & {
-              duration?: string;
-            }
-          >;
-        };
+        const state = persistedState as Partial<PersistedPlanState>;
 
         if (!state?.plans) {
-          return { plans: [] } as PlanState;
+          return { plans: [] };
         }
 
         if (version < 2) {
           return {
             plans: state.plans.filter((plan) => ![1, 2, 3].includes(plan.id)),
-          } as PlanState;
+          };
         }
 
         if (version < 3) {
           return {
             plans: state.plans.filter((plan) => ![1, 2, 3].includes(plan.id)),
-          } as PlanState;
+          };
         }
 
         return {
@@ -139,16 +126,25 @@ export const usePlanStore = create<PlanState>()(
               typeof plan.durationLabel === "string"
                 ? plan.durationLabel
                 : plan.duration;
-            const parsedMonths = Number(String(fromLabel ?? "").match(/^(\d+)\s*month(s)?$/i)?.[1] ?? "1");
-            const durationMonths = Number.isFinite(parsedMonths) && parsedMonths > 0 ? parsedMonths : 1;
+            const normalizedLabel = String(fromLabel ?? "").trim().toLowerCase();
+            const parsedMonths = Number(normalizedLabel.match(/^(\d+)\s*month(s)?$/i)?.[1] ?? "");
+            const parsedYears = Number(normalizedLabel.match(/^(\d+)\s*year(s)?$/i)?.[1] ?? "");
+            const durationMonths = Number.isFinite(parsedMonths) && parsedMonths > 0
+              ? parsedMonths
+              : Number.isFinite(parsedYears) && parsedYears > 0
+                ? parsedYears
+                : 1;
 
             return {
               ...plan,
               durationMonths,
-              durationLabel: `${durationMonths} month${durationMonths > 1 ? "s" : ""}`,
+              durationLabel:
+                normalizedLabel.match(/^\d+\s*year(s)?$/i)
+                  ? `${durationMonths} year${durationMonths > 1 ? "s" : ""}`
+                  : formatPlanDurationLabel(plan.planName, durationMonths),
             };
           }),
-        } as PlanState;
+        };
       },
     },
   ),

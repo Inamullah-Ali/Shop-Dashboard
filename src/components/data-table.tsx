@@ -80,6 +80,7 @@ import { DeleteDialogue } from "./Dialogue/deletedialogue";
 import { useShopStore } from "@/store/shop-store";
 import { EditDialogue } from "./Dialogue/editdialogue";
 import { getDerivedShopStatus, isShopActiveStatus } from "@/lib/package-utils";
+import { toast } from "sonner";
 
 export const schema = z.object({
   id: z.number(),
@@ -94,6 +95,7 @@ export const schema = z.object({
   city: z.string(),
   shopType: z.string(),
   email: z.string(),
+  role: z.enum(["admin", "shopAdmin"]).optional(),
   status: z.string(),
   packageDuration: z.string().optional(),
   image: z.string().optional(),
@@ -165,6 +167,52 @@ export function DataTable() {
 
     return parsed;
   }, [testDate]);
+
+  const selectedShopIds = React.useMemo(
+    () =>
+      Object.entries(rowSelection as Record<string, boolean>)
+        .filter(([, selected]) => Boolean(selected))
+        .map(([id]) => Number(id))
+        .filter((id) => Number.isFinite(id)),
+    [rowSelection],
+  );
+
+  const deleteSelectedShops = React.useCallback(() => {
+    if (!selectedShopIds.length) {
+      return;
+    }
+
+    const selectedSet = new Set(selectedShopIds);
+    const remainingShops = shops.filter((shop) => !selectedSet.has(shop.id));
+    setShops(remainingShops);
+    setRowSelection({});
+    toast.dismiss();
+  }, [selectedShopIds, setShops, shops]);
+
+  React.useEffect(() => {
+    if (!selectedShopIds.length) {
+      toast.dismiss("selected-shops-toast");
+      return;
+    }
+
+    toast.message(
+      `${selectedShopIds.length} shop${selectedShopIds.length > 1 ? "s" : ""} selected`,
+      {
+        id: "selected-shops-toast",
+        duration: Infinity,
+        position: "bottom-center",
+        dismissible: false,
+        action: {
+          label: "Delete",
+          onClick: deleteSelectedShops,
+        },
+      },
+    );
+
+    return () => {
+      toast.dismiss("selected-shops-toast");
+    };
+  }, [deleteSelectedShops, selectedShopIds.length]);
 
   const matchesSearch = React.useCallback(
     (shop: z.infer<typeof schema>) => {
