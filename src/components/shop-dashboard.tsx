@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { useAuth } from "@/components/login/authContext";
+import { NewSaleDialog } from "@/components/new-sale-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,15 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -48,14 +40,8 @@ export function ShopDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { products } = useProductStore();
-  const { sales, customers, addSale } = useShopOpsStore();
+  const { sales, customers } = useShopOpsStore();
 
-  const [saleFormOpen, setSaleFormOpen] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [productName, setProductName] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("Cash");
 
   const ownerEmail = user?.email?.toLowerCase() ?? "";
@@ -139,32 +125,10 @@ export function ShopDashboard() {
           acc[sale.paymentMethod] += 1;
           return acc;
         },
-        { Cash: 0, Card: 0, Other: 0 }
+        { Cash: 0, Card: 0, Credit: 0 }
       ),
     [todaySales]
   );
-
-  const addNewSale = () => {
-    if (!ownerEmail || !productName.trim() || !customerName.trim() || !amount) {
-      return;
-    }
-
-    addSale({
-      ownerEmail,
-      customerName: customerName.trim(),
-      productName: productName.trim(),
-      quantity: Number(quantity) || 1,
-      amount: Number(amount) || 0,
-      paymentMethod,
-    });
-
-    setCustomerName("");
-    setProductName("");
-    setQuantity("1");
-    setAmount("");
-    setPaymentMethod("Cash");
-    setSaleFormOpen(false);
-  };
 
   return (
     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -244,56 +208,7 @@ export function ShopDashboard() {
             <CardDescription>Track today&apos;s sales and payment methods</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full" onClick={() => setSaleFormOpen((previous) => !previous)}>
-              New Sale
-            </Button>
-
-            {saleFormOpen ? (
-              <div className="space-y-2 rounded-md border p-3">
-                <div className="space-y-1">
-                  <Label>Customer</Label>
-                  <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Product</Label>
-                  <Input value={productName} onChange={(event) => setProductName(event.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label>Quantity</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(event) => setQuantity(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Amount</Label>
-                    <Input type="number" min={0} value={amount} onChange={(event) => setAmount(event.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Payment</Label>
-                  <Select
-                    value={paymentMethod}
-                    onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Card">Card</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={addNewSale}>
-                  Save Sale
-                </Button>
-              </div>
-            ) : null}
+            <NewSaleDialog ownerEmail={ownerEmail} scopedProducts={scopedProducts} />
 
             <div className="rounded-md border p-3 text-sm">
               <p>Transactions: {todaySales.length}</p>
@@ -302,7 +217,7 @@ export function ShopDashboard() {
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              {(["Cash", "Card", "Other"] as PaymentMethod[]).map((method) => (
+              {(["Cash", "Card", "Credit"] as PaymentMethod[]).map((method) => (
                 <Button
                   key={method}
                   variant={selectedPaymentMethod === method ? "default" : "outline"}
@@ -358,11 +273,11 @@ export function ShopDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex max-h-96 flex-col">
           <CardHeader>
             <CardTitle>Top Selling Products</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="min-h-0 space-y-2 overflow-y-auto">
             {topSellingProducts.length ? (
               topSellingProducts.map((item) => (
                 <div key={item.name} className="flex items-center justify-between rounded-md border px-3 py-2">

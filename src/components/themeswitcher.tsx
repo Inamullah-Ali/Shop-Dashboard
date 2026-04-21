@@ -1,17 +1,17 @@
 import { useTheme } from "./theme-provider";
 import { Switch } from "./ui/switch";
 export function ThemeSwitch() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
-  const isDark = theme === "dark";
+  const isDark = resolvedTheme === "dark";
 
   function toggleTheme() {
     setTheme(isDark ? "light" : "dark");
   }
   return (
     <div className="flex items-center space-x-2">
-      <span className="text-sm font-mono text-black dark:text-white">
-        {isDark ? "ON" : "OFF"}
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+        {isDark ? "Dark" : "Light"}
       </span>
       <Switch checked={isDark} onCheckedChange={toggleTheme} className="cursor-pointer" />
     </div>

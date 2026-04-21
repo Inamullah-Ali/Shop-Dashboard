@@ -29,9 +29,30 @@ export const useProductStore = create<ProductState>()(
 
       addProduct: (product) =>
         set((state) => {
+          const normalizedInput = normalizeProduct(product as Product);
+          const existingIndex = state.products.findIndex(
+            (item) =>
+              item.ownerEmail === normalizedInput.ownerEmail &&
+              item.productName.toLowerCase() === normalizedInput.productName.toLowerCase(),
+          );
+
+          if (existingIndex >= 0) {
+            const existing = state.products[existingIndex];
+            const merged = normalizeProduct({
+              ...existing,
+              quantity: existing.quantity + normalizedInput.quantity,
+            });
+
+            return {
+              products: state.products.map((item, index) =>
+                index === existingIndex ? merged : item,
+              ),
+            };
+          }
+
           const id = Date.now();
           const nextProduct = normalizeProduct({
-            ...product,
+            ...normalizedInput,
             id,
             createdAt: new Date(id).toISOString(),
           });

@@ -70,7 +70,7 @@ export default function PurchasePage() {
                 <div className="space-y-1">
                   <Label>Quantity</Label>
                   <Input
-                    type="number"
+                    type="text"
                     min={1}
                     value={quantity}
                     onChange={(event) => setQuantity(event.target.value)}
@@ -79,7 +79,7 @@ export default function PurchasePage() {
                 <div className="space-y-1">
                   <Label>Amount</Label>
                   <Input
-                    type="number"
+                    type="text"
                     min={0}
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}

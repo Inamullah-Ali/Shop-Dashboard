@@ -165,7 +165,7 @@ export function EditProductDialogue({ product, onUpdateProduct }: EditProductDia
                 <Label htmlFor={`edit-price-${product.id}`}>Price</Label>
                 <Input
                   id={`edit-price-${product.id}`}
-                  type="number"
+                  type="text"
                   min={0}
                   step="0.01"
                   value={form.price}
@@ -184,7 +184,7 @@ export function EditProductDialogue({ product, onUpdateProduct }: EditProductDia
                 <Label htmlFor={`edit-quantity-${product.id}`}>Quantity</Label>
                 <Input
                   id={`edit-quantity-${product.id}`}
-                  type="number"
+                  type="text"
                   min={0}
                   step="1"
                   value={form.quantity}
@@ -204,7 +204,7 @@ export function EditProductDialogue({ product, onUpdateProduct }: EditProductDia
               <Label htmlFor={`edit-discount-${product.id}`}>Discount</Label>
               <Input
                 id={`edit-discount-${product.id}`}
-                type="number"
+                type="text"
                 min={0}
                 step="0.01"
                 value={form.discount}

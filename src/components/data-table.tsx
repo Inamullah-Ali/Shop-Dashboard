@@ -75,6 +75,7 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { AddDialogue } from "./Dialogue/adddialogue";
 import { DeleteDialogue } from "./Dialogue/deletedialogue";
 import { useShopStore } from "@/store/shop-store";
@@ -186,8 +187,13 @@ export function DataTable() {
     const remainingShops = shops.filter((shop) => !selectedSet.has(shop.id));
     setShops(remainingShops);
     setRowSelection({});
-    toast.dismiss();
+    toast.dismiss("selected-shops-toast");
   }, [selectedShopIds, setShops, shops]);
+
+  const handleCancelDelete = React.useCallback(() => {
+    setRowSelection({});
+    toast.dismiss("selected-shops-toast");
+  }, []);
 
   React.useEffect(() => {
     if (!selectedShopIds.length) {
@@ -195,16 +201,40 @@ export function DataTable() {
       return;
     }
 
-    toast.message(
-      `${selectedShopIds.length} shop${selectedShopIds.length > 1 ? "s" : ""} selected`,
+    const count = selectedShopIds.length;
+    const countLabel = count === 1 ? "1 shop selected" : `${count} shops selected`;
+
+    toast.custom(
+      () => (
+        <div className="w-full rounded-lg border border-red-300 bg-red-200 px-4 py-3 text-red-500 shadow-sm">
+          <p className="text-sm font-semibold">Are you sure you want to delete the shop(s)?</p>
+          <p className="mt-1 text-xs">{countLabel}</p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 border-red-300 bg-white text-red-500 hover:bg-red-100"
+              onClick={handleCancelDelete}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 bg-red-500 text-white hover:bg-red-600"
+              onClick={deleteSelectedShops}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      ),
       {
         id: "selected-shops-toast",
-        duration: Infinity,
-        position: "bottom-center",
-        dismissible: false,
-        action: {
-          label: "Delete",
-          onClick: deleteSelectedShops,
+        duration: Number.POSITIVE_INFINITY,
+        classNames: {
+          toast: "bg-transparent p-0 shadow-none border-0",
         },
       },
     );
@@ -212,7 +242,7 @@ export function DataTable() {
     return () => {
       toast.dismiss("selected-shops-toast");
     };
-  }, [deleteSelectedShops, selectedShopIds.length]);
+  }, [handleCancelDelete, deleteSelectedShops, selectedShopIds]);
 
   const matchesSearch = React.useCallback(
     (shop: z.infer<typeof schema>) => {

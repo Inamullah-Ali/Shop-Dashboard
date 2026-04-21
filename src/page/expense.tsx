@@ -62,8 +62,8 @@ export default function ExpensePage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Amount</Label>
-                  <Input
-                    type="number"
+                    <Input
+                      type="text"
                     min={0}
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}

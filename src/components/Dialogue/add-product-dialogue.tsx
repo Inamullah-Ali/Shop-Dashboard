@@ -169,7 +169,7 @@ export function AddProductDialogue({ onAddProduct }: AddProductDialogueProps) {
                 <Label htmlFor="price">Price</Label>
                 <Input
                   id="price"
-                  type="number"
+                  type="text"
                   min={0}
                   step="0.01"
                   value={form.price}
@@ -188,7 +188,7 @@ export function AddProductDialogue({ onAddProduct }: AddProductDialogueProps) {
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input
                   id="quantity"
-                  type="number"
+                  type="text"
                   min={0}
                   step="1"
                   value={form.quantity}
@@ -206,9 +206,9 @@ export function AddProductDialogue({ onAddProduct }: AddProductDialogueProps) {
 
             <div className="flex flex-col gap-1">
               <Label htmlFor="discount">Discount</Label>
-              <Input
-                id="discount"
-                type="number"
+                <Input
+                  id="discount"
+                  type="text"
                 min={0}
                 step="0.01"
                 value={form.discount}

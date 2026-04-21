@@ -1,4 +1,5 @@
 import type {
+  CreditEntry,
   CustomerEntry,
   ExpenseEntry,
   PurchaseEntry,
@@ -8,6 +9,9 @@ import type {
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+const getNextId = (entries: Array<{ id: number }>) =>
+  entries.reduce((maxId, entry) => (entry.id > maxId ? entry.id : maxId), Date.now() - 1) + 1;
+
 const normalizeSale = (sale: SaleEntry): SaleEntry => ({
   ...sale,
   ownerEmail: sale.ownerEmail.toLowerCase().trim(),
@@ -16,6 +20,17 @@ const normalizeSale = (sale: SaleEntry): SaleEntry => ({
   quantity: Number.isFinite(sale.quantity) && sale.quantity > 0 ? Math.trunc(sale.quantity) : 1,
   amount: Number.isFinite(sale.amount) && sale.amount >= 0 ? sale.amount : 0,
   paymentMethod: sale.paymentMethod,
+});
+
+const normalizeCredit = (credit: CreditEntry): CreditEntry => ({
+  ...credit,
+  ownerEmail: credit.ownerEmail.toLowerCase().trim(),
+  customerName: credit.customerName.trim(),
+  phone: credit.phone.trim(),
+  totalAmount: Number.isFinite(credit.totalAmount) && credit.totalAmount >= 0 ? credit.totalAmount : 0,
+  paidAmount: Number.isFinite(credit.paidAmount) && credit.paidAmount >= 0 ? credit.paidAmount : 0,
+  status: credit.status,
+  products: credit.products || [],
 });
 
 const normalizeCustomer = (customer: CustomerEntry): CustomerEntry => ({
@@ -49,13 +64,14 @@ export const useShopOpsStore = create<ShopOpsState>()(
   persist(
     (set) => ({
       sales: [],
+      credits: [],
       customers: [],
       purchases: [],
       expenses: [],
 
       addSale: (sale) =>
         set((state) => {
-          const id = Date.now();
+          const id = getNextId(state.sales);
           const nextSale = normalizeSale({
             ...sale,
             id,
@@ -67,9 +83,35 @@ export const useShopOpsStore = create<ShopOpsState>()(
           };
         }),
 
+      addCredit: (credit) =>
+        set((state) => {
+          const id = getNextId(state.credits);
+          const nextCredit = normalizeCredit({
+            ...credit,
+            id,
+            createdAt: new Date(id).toISOString(),
+          });
+
+          return {
+            credits: [nextCredit, ...state.credits],
+          };
+        }),
+
+      updateCredit: (id, updates) =>
+        set((state) => ({
+          credits: state.credits.map((credit) =>
+            credit.id === id ? normalizeCredit({ ...credit, ...updates }) : credit
+          ),
+        })),
+
+      deleteCredit: (id) =>
+        set((state) => ({
+          credits: state.credits.filter((credit) => credit.id !== id),
+        })),
+
       addCustomer: (customer) =>
         set((state) => {
-          const id = Date.now();
+          const id = getNextId(state.customers);
           const nextCustomer = normalizeCustomer({
             ...customer,
             id,
@@ -83,7 +125,7 @@ export const useShopOpsStore = create<ShopOpsState>()(
 
       addPurchase: (purchase) =>
         set((state) => {
-          const id = Date.now();
+          const id = getNextId(state.purchases);
           const nextPurchase = normalizePurchase({
             ...purchase,
             id,
@@ -97,7 +139,7 @@ export const useShopOpsStore = create<ShopOpsState>()(
 
       addExpense: (expense) =>
         set((state) => {
-          const id = Date.now();
+          const id = getNextId(state.expenses);
           const nextExpense = normalizeExpense({
             ...expense,
             id,
@@ -118,6 +160,7 @@ export const useShopOpsStore = create<ShopOpsState>()(
         }
 
         state.sales = state.sales.map(normalizeSale);
+        state.credits = (state.credits || []).map(normalizeCredit);
         state.customers = state.customers.map(normalizeCustomer);
         state.purchases = state.purchases.map(normalizePurchase);
         state.expenses = state.expenses.map(normalizeExpense);
@@ -125,3 +168,4 @@ export const useShopOpsStore = create<ShopOpsState>()(
     }
   )
 );
+

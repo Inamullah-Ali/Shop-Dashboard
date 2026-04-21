@@ -33,7 +33,7 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Low stock items are products with quantity 5 or less.
+                Low stock items are products with quantity from 1 to 5.
               </p>
             </CardContent>
           </Card>
@@ -57,8 +57,20 @@ export default function InventoryPage() {
                         <TableCell className="text-right">Rs. {product.price}</TableCell>
                         <TableCell className="text-right">{product.quantity}</TableCell>
                         <TableCell className="text-right">
-                          <span className={product.quantity <= 5 ? "text-red-500 font-semibold" : "text-green-600"}>
-                            {product.quantity <= 5 ? "Low" : "Healthy"}
+                          <span
+                            className={
+                              product.quantity === 0
+                                ? "text-rose-600 font-semibold"
+                                : product.quantity <= 5
+                                  ? "text-amber-600 font-semibold"
+                                  : "text-green-600"
+                            }
+                          >
+                            {product.quantity === 0
+                              ? "Out of Stock"
+                              : product.quantity <= 5
+                                ? "Low Stock"
+                                : "Healthy"}
                           </span>
                         </TableCell>
                       </TableRow>

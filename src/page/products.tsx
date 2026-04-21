@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { useAuth } from "@/components/login/authContext";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -15,6 +17,7 @@ import { AddProductDialogue } from "@/components/Dialogue/add-product-dialogue";
 import { EditProductDialogue } from "@/components/Dialogue/edit-product-dialogue";
 import { DeleteProductDialogue } from "@/components/Dialogue/delete-product-dialogue";
 import { useProductStore } from "@/store/product-store";
+import { AlertTriangle } from "lucide-react";
 
 type ProductFormValues = {
   productName: string;
@@ -23,6 +26,8 @@ type ProductFormValues = {
   quantity: number;
   discount: number;
 };
+
+const BULK_DELETE_TOAST_ID = "bulk-delete-products-confirmation";
 
 export default function Products() {
   const { user } = useAuth();
@@ -102,6 +107,91 @@ export default function Products() {
     });
   };
 
+  const selectedProductIds = useMemo(
+    () =>
+      Object.entries(selectedRows)
+        .filter(([, selected]) => Boolean(selected))
+        .map(([id]) => Number(id))
+        .filter((id) => products.some((product) => product.id === id)),
+    [products, selectedRows],
+  );
+
+  const handleDeleteSelectedProducts = useCallback(() => {
+    if (!selectedProductIds.length) {
+      return;
+    }
+
+    selectedProductIds.forEach((id) => {
+      deleteProduct(id);
+    });
+
+    setSelectedRows((previous) => {
+      const next = { ...previous };
+      selectedProductIds.forEach((id) => {
+        delete next[id];
+      });
+      return next;
+    });
+
+    toast.dismiss(BULK_DELETE_TOAST_ID);
+  }, [deleteProduct, selectedProductIds]);
+
+  const handleCancelDelete = useCallback(() => {
+    setSelectedRows({});
+    toast.dismiss(BULK_DELETE_TOAST_ID);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProductIds.length) {
+      toast.dismiss(BULK_DELETE_TOAST_ID);
+      return;
+    }
+
+    const count = selectedProductIds.length;
+    const countLabel = count === 1 ? "1 product selected" : `${count} products selected`;
+
+    toast.custom(
+      () => (
+        <div className="w-full rounded-lg border border-red-100 bg-red-100 px-4 py-3 text-red-500 shadow-sm">
+          <p className="text-sm font-semibold"><AlertTriangle /> Are you sure you want to delete the product(s)?</p>
+          <p className="mt-1 text-xs">{countLabel}</p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 border-red-300 bg-white text-red-500 hover:bg-red-100 cursor-pointer rounded-sm"
+              onClick={handleCancelDelete}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 bg-red-500 text-white hover:bg-red-600 cursor-pointer rounded-sm"
+              onClick={handleDeleteSelectedProducts}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      ),
+      {
+        id: BULK_DELETE_TOAST_ID,
+        duration: Number.POSITIVE_INFINITY,
+        classNames: {
+          toast: "bg-transparent p-0 shadow-none border-0",
+        },
+      },
+    );
+  }, [handleCancelDelete, handleDeleteSelectedProducts, selectedProductIds]);
+
+  useEffect(() => {
+    return () => {
+      toast.dismiss(BULK_DELETE_TOAST_ID);
+    };
+  }, []);
+
   const handleAddProduct = (values: ProductFormValues) => {
     if (!user) {
       return;
@@ -117,6 +207,12 @@ export default function Products() {
   const handleUpdateProduct = (id: number, values: ProductFormValues) => {
     updateProduct(id, values);
   };
+  
+  useEffect(() => {
+    return () => {
+      toast.dismiss(BULK_DELETE_TOAST_ID);
+    };
+  }, []);
 
   return (
     <div className="flex flex-1 flex-col">

@@ -100,6 +100,12 @@ const data = {
       roles: ["shopAdmin"] as UserRole[],
     },
     {
+      title: "Credit",
+      url: "/credit",
+      icon: <CreditCardIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
       title: "Payment",
       url: "/payment",
       icon: (

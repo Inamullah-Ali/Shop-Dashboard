@@ -13,6 +13,7 @@ import InventoryPage from "./page/inventory";
 import CustomersPage from "./page/customers";
 import PurchasePage from "./page/purchase";
 import ExpensePage from "./page/expense";
+import { CreditPage } from "./page/credit";
 import { Toaster } from "./components/ui/sonner";
 import UnProtectedRoute from "./components/login/unProtexted";
 import LoginPage from "./page/loginpage";
@@ -132,6 +133,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["shopAdmin"]}>
                 <ExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="credit"
+            element={
+              <ProtectedRoute allowedRoles={["shopAdmin"]}>
+                <CreditPage />
               </ProtectedRoute>
             }
           />
