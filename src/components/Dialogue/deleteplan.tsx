@@ -9,23 +9,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { usePlanStore } from "@/store/addPlanStore";
 import { Trash2, } from "lucide-react"
 import { useState } from "react";
 
 type Props = {
   rowData: {
     id: number;
+    appwriteDocumentId?: string;
     shopName: string;
   };
+  onDeletePlan: (rowData: { id: number; appwriteDocumentId?: string; shopName: string }) => void | Promise<void>;
 };
 
-export function DeletePlan({ rowData }: Props) {
+export function DeletePlan({ rowData, onDeletePlan }: Props) {
   const [open, setOpen] = useState(false);
-  const { deletePlan } = usePlanStore();
 
-  const handleDelete = () => {
-    deletePlan(rowData.id);
+  const handleDelete = async () => {
+    await onDeletePlan(rowData);
     setOpen(false);
   };
 
@@ -50,7 +50,7 @@ export function DeletePlan({ rowData }: Props) {
             <Button
               className="bg-red-500 cursor-pointer"
               type="button"
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
             >
               Delete
             </Button>

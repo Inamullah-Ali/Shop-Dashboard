@@ -9,19 +9,20 @@ import {
   XAxis,
 } from "recharts";
 import {
+  Bell,
   ChevronDown,
   CircleDollarSign,
   CreditCard,
   FileBarChart2,
   Package,
   ReceiptText,
-  TriangleAlert,
   Users,
 } from "lucide-react";
 
 import heroImage from "@/assets/hero.png";
 import { NewSaleDialog } from "@/components/new-sale-dialog";
 import { useAuth } from "@/components/login/authContext";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { designTokens } from "@/components/ui/design-tokens";
 import {
@@ -39,6 +40,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Table,
   TableBody,
   TableCell,
@@ -48,6 +56,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useProductStore } from "@/store/product-store";
+import { usePublicCommerceStore } from "@/store/public-commerce-store";
 import { useShopOpsStore } from "@/store/shop-ops-store";
 import type { SaleEntry } from "@/types/shop-ops";
 
@@ -229,11 +238,14 @@ export function ModernShopDashboard() {
   const [searchParams] = useSearchParams();
   const { products } = useProductStore();
   const { sales, customers, credits } = useShopOpsStore();
+  const { notifications, markNotificationRead, markAllNotificationsRead } =
+    usePublicCommerceStore();
 
   const [selectedPeriod, setSelectedPeriod] = useState<TrendPeriod>("thisWeek");
   const [topSellingPeriod, setTopSellingPeriod] = useState<SalesMonthPeriod>("thisMonth");
   const [calendarValue, setCalendarValue] = useState(() => formatDateInputValue(new Date()));
   const [isRecentSalesExpanded, setIsRecentSalesExpanded] = useState(false);
+  const [isNotificationSheetOpen, setIsNotificationSheetOpen] = useState(false);
 
   const ownerEmail = user?.email?.toLowerCase().trim() ?? "";
   const isGlobalView = user?.role === "admin";
@@ -486,6 +498,32 @@ export function ModernShopDashboard() {
     [filteredTopProducts],
   );
 
+  const ownerNotifications = useMemo(
+    () =>
+      isGlobalView
+        ? notifications
+        : notifications.filter(
+            (notification) => notification.ownerEmail === ownerEmail,
+          ),
+    [isGlobalView, notifications, ownerEmail],
+  );
+
+  const orderStatusSummary = useMemo(() => {
+    const lines = ownerNotifications.flatMap((notification) => notification.items);
+
+    return {
+      total: lines.length,
+      processing: lines.filter((line) => line.status === "Processing").length,
+      successful: lines.filter((line) => line.status === "Delivered").length,
+      cancelled: lines.filter((line) => line.status === "Cancelled").length,
+    };
+  }, [ownerNotifications]);
+
+  const unreadNotificationCount = useMemo(
+    () => ownerNotifications.filter((notification) => !notification.isRead).length,
+    [ownerNotifications],
+  );
+
   const statCards = [
     {
       title: "Today's Sales",
@@ -520,10 +558,10 @@ export function ModernShopDashboard() {
       tint: "bg-orange-50 text-orange-600",
     },
     {
-      title: "Low Stock",
-      value: String(lowStockProducts.length),
-      note: "Needs attention",
-      icon: <TriangleAlert className="size-5" />,
+      title: "Orders",
+      value: String(orderStatusSummary.total),
+      note: `Processing ${orderStatusSummary.processing} • Successful ${orderStatusSummary.successful} • Cancelled ${orderStatusSummary.cancelled}`,
+      icon: <ReceiptText className="size-5" />,
       accent: "from-rose-500 to-red-500",
       tint: "bg-rose-50 text-rose-600",
     },
@@ -538,7 +576,7 @@ export function ModernShopDashboard() {
             <div className="flex flex-row justify-between items-center">
               <div>
                 <h1 className={`mt-1 ${designTokens.text.title} ${designTokens.colors.textPrimary} sm:text-3xl`}>
-                  Welcome back, Ali
+                  Welcome back, {user?.name ?? "Owner"}
                 </h1>
                 <p className={`mt-1 ${designTokens.text.body} ${designTokens.colors.textMuted}`}>
                   Here's what's happening with your shop today.
@@ -546,13 +584,168 @@ export function ModernShopDashboard() {
               </div>
               <div>
                 <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                    <input
-                      type="date"
-                      value={calendarValue}
-                      onChange={(event) => setCalendarValue(event.target.value)}
-                      className="h-5 bg-transparent text-sm font-medium text-slate-700 outline-none"
-                    />
+                  <div className="flex items-center gap-2">
+                    <Sheet
+                      open={isNotificationSheetOpen}
+                      onOpenChange={setIsNotificationSheetOpen}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="relative"
+                        onClick={() => setIsNotificationSheetOpen(true)}
+                      >
+                        <Bell className="size-4" />
+                        Notifications
+                        {unreadNotificationCount ? (
+                          <Badge
+                            className="absolute -top-2 -right-2 min-w-5 justify-center px-1"
+                            variant="destructive"
+                          >
+                            {unreadNotificationCount}
+                          </Badge>
+                        ) : null}
+                      </Button>
+
+                      <SheetContent className="sm:max-w-lg">
+                        <SheetHeader>
+                          <SheetTitle>Order notifications</SheetTitle>
+                          <SheetDescription>
+                            New customer orders routed to your shop appear here.
+                          </SheetDescription>
+                        </SheetHeader>
+
+                        <div className="space-y-3 overflow-y-auto p-4">
+                          {ownerNotifications.length ? (
+                            ownerNotifications.map((notification) => (
+                              <Card
+                                key={notification.id}
+                                role="button"
+                                tabIndex={0}
+                                className={cn(
+                                  "cursor-pointer border-slate-200 bg-white transition hover:border-blue-300 hover:bg-blue-50/60",
+                                  !notification.isRead &&
+                                    "border-blue-200 bg-blue-50/40",
+                                )}
+                                onClick={() => {
+                                  markNotificationRead(notification.id)
+                                  setIsNotificationSheetOpen(false)
+                                  navigate("/orders")
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault()
+                                    markNotificationRead(notification.id)
+                                    setIsNotificationSheetOpen(false)
+                                    navigate("/orders")
+                                  }
+                                }}
+                              >
+                                <CardContent className="space-y-3 p-3">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-semibold text-slate-900">
+                                        Order #{notification.orderId}
+                                      </p>
+                                      <p className="text-xs text-slate-500">
+                                        {new Date(notification.createdAt).toLocaleString()}
+                                      </p>
+                                    </div>
+                                    {!notification.isRead ? (
+                                      <Badge variant="secondary">New</Badge>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="rounded-lg border border-slate-200 bg-white p-2 text-sm">
+                                    <p className="font-medium text-slate-900">
+                                      {notification.customer.customerName}
+                                    </p>
+                                    <p className="text-slate-600">
+                                      {notification.customer.email || "-"}
+                                    </p>
+                                    <p className="text-slate-600">{notification.customer.phone}</p>
+                                    <p className="text-slate-600">
+                                      {notification.customer.address}
+                                    </p>
+                                    <p className="text-slate-600">
+                                      {notification.customer.city || "-"}
+                                    </p>
+                                    {notification.customer.note ? (
+                                      <p className="text-slate-600">
+                                        Note: {notification.customer.note}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    {notification.items.map((item, index) => (
+                                      <div
+                                        key={`${notification.id}-${item.productId}-${index}`}
+                                        className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                                      >
+                                        <span className="font-medium text-slate-700">
+                                          {item.productName}
+                                        </span>
+                                        <span className="text-slate-600">
+                                          Qty {item.quantity}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      Total: {formatCurrency(notification.totalAmount)}
+                                    </p>
+                                    {!notification.isRead ? (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="outline"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          markNotificationRead(notification.id)
+                                        }}
+                                      >
+                                        Mark read
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          ) : (
+                            <Card className="border-dashed border-slate-300 bg-white/80">
+                              <CardContent className="py-10 text-center text-slate-500">
+                                No order notifications yet.
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+
+                        {ownerNotifications.length ? (
+                          <div className="border-t border-slate-200 p-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => markAllNotificationsRead(ownerEmail)}
+                            >
+                              Mark all as read
+                            </Button>
+                          </div>
+                        ) : null}
+                      </SheetContent>
+                    </Sheet>
+
+                    <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                      <input
+                        type="date"
+                        value={calendarValue}
+                        onChange={(event) => setCalendarValue(event.target.value)}
+                        className="h-5 bg-transparent text-sm font-medium text-slate-700 outline-none"
+                      />
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500">{calendarLabel}</p>
                 </div>
@@ -754,7 +947,7 @@ export function ModernShopDashboard() {
           </section>
 
           <section className="grid items-start gap-3 xl:grid-cols-[53%_24%_21%]">
-            <Card className="border border-slate-200/90 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.06)] -mt-19">
+            <Card className="border border-slate-200/90 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.06)] -mt-19 h-92">
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="font-bold">Recent Selling</CardTitle>

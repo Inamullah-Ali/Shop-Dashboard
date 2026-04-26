@@ -1,5 +1,6 @@
 export type Product = {
   id: number;
+  appwriteDocumentId?: string;
   createdAt: string;
   ownerEmail: string;
   ownerName: string;

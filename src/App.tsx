@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
 import { TooltipProvider } from "./components/ui/tooltip";
 import Feature from "./feature/feature";
@@ -14,32 +15,149 @@ import CustomersPage from "./page/customers";
 import PurchasePage from "./page/purchase";
 import ExpensePage from "./page/expense";
 import { CreditPage } from "./page/credit";
+import OrdersPage from "./page/orders";
 import { Toaster } from "./components/ui/sonner";
-import UnProtectedRoute from "./components/login/unProtexted";
-import LoginPage from "./page/loginpage";
 import ProtectedRoute from "./components/login/ProtectedRoute";
+import PublicProductsPage from "./page/public-products";
+import ResetPasswordPage from "./page/reset-password";
+import { useShopStore } from "./store/shop-store";
+import { fetchShopsFromAppwrite } from "./service/appwriteShop";
+import { usePlanStore } from "./store/addPlanStore";
+import { fetchPlansFromAppwrite } from "./service/appwritePlan";
+import { useProductStore } from "./store/product-store";
+import { fetchProductsFromAppwrite } from "./service/appwriteProduct";
+import { toast } from "sonner";
+import {
+  appwriteClient,
+  appwriteDatabaseId,
+  appwritePlanCollectionId,
+  appwriteProductCollectionId,
+  appwriteShopCollectionId,
+} from "./lib/appwrite";
 
 function App() {
+  const setShops = useShopStore((state) => state.setShops);
+  const setPlans = usePlanStore((state) => state.setPlans);
+  const setProducts = useProductStore((state) => state.setProducts);
+
+  useEffect(() => {
+    let active = true;
+
+    const syncShops = async () => {
+      try {
+        const shops = await fetchShopsFromAppwrite();
+
+        if (active) {
+          setShops(shops);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to sync shops from Appwrite");
+      }
+    };
+
+    void syncShops();
+
+    if (appwriteDatabaseId && appwriteShopCollectionId) {
+      const channel = `databases.${appwriteDatabaseId}.collections.${appwriteShopCollectionId}.documents`;
+
+      const unsubscribe = appwriteClient.subscribe(channel, () => {
+        void syncShops();
+      });
+
+      return () => {
+        active = false;
+        void unsubscribe();
+      };
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [setShops]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!appwriteDatabaseId || !appwritePlanCollectionId) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const syncPlans = async () => {
+      try {
+        const plans = await fetchPlansFromAppwrite();
+
+        if (active) {
+          setPlans(plans);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to sync plans from Appwrite");
+      }
+    };
+
+    void syncPlans();
+
+    const channel = `databases.${appwriteDatabaseId}.collections.${appwritePlanCollectionId}.documents`;
+
+    const unsubscribe = appwriteClient.subscribe(channel, () => {
+      void syncPlans();
+    });
+
+    return () => {
+      active = false;
+      void unsubscribe();
+    };
+  }, [setPlans]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!appwriteDatabaseId || !appwriteProductCollectionId) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const syncProducts = async () => {
+      try {
+        const products = await fetchProductsFromAppwrite();
+
+        if (active) {
+          setProducts(products);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to sync products from Appwrite");
+      }
+    };
+
+    void syncProducts();
+
+    const channel = `databases.${appwriteDatabaseId}.collections.${appwriteProductCollectionId}.documents`;
+
+    const unsubscribe = appwriteClient.subscribe(channel, () => {
+      void syncProducts();
+    });
+
+    return () => {
+      active = false;
+      void unsubscribe();
+    };
+  }, [setProducts]);
+
   return (
     <TooltipProvider>
       <Routes>
+        <Route index element={<PublicProductsPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="login" element={<Navigate to="/" replace />} />
         <Route
-          index
-          element={
-            <UnProtectedRoute>
-              <LoginPage />
-            </UnProtectedRoute>
-          }
-        />
-        <Route
-          path="/"
           element={
             <ProtectedRoute allowedRoles={["admin", "shopAdmin"]}>
               <Feature />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" />} />
           <Route
             path="dashboard"
             element={
@@ -141,6 +259,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["shopAdmin"]}>
                 <CreditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="orders"
+            element={
+              <ProtectedRoute allowedRoles={["shopAdmin"]}>
+                <OrdersPage />
               </ProtectedRoute>
             }
           />

@@ -8,11 +8,11 @@ const shopBaseSchema = z.object({
   city: z.string().min(1, "City is required"),
   shopType: z.string().min(1, "Shop type is required"),
   email: z.string().email("Invalid email"),
-  selectedPlanId: z.number().min(1, "Plan is required"),
+  selectedPlanId: z.number().int().min(1, "Plan is required"),
 });
 
 export const addShopSchema = shopBaseSchema.extend({
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export const editShopSchema = shopBaseSchema.extend({

@@ -75,13 +75,15 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
-import { AlertTriangle } from "lucide-react";
 import { AddDialogue } from "./Dialogue/adddialogue";
 import { DeleteDialogue } from "./Dialogue/deletedialogue";
 import { useShopStore } from "@/store/shop-store";
 import { EditDialogue } from "./Dialogue/editdialogue";
 import { getDerivedShopStatus, isShopActiveStatus } from "@/lib/package-utils";
 import { toast } from "sonner";
+import { deleteShopInAppwrite } from "@/service/appwriteShop";
+import { purgeShopRelatedLocalData } from "@/service/shop-cascade";
+import type { IShop } from "@/types/tabledata";
 
 export const schema = z.object({
   id: z.number(),
@@ -96,7 +98,7 @@ export const schema = z.object({
   city: z.string(),
   shopType: z.string(),
   email: z.string(),
-  role: z.enum(["admin", "shopAdmin"]).optional(),
+  role: z.enum(["admin", "shopAdmin", "customer"]).optional(),
   status: z.string(),
   packageDuration: z.string().optional(),
   image: z.string().optional(),
@@ -128,9 +130,7 @@ export function DataTable() {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [globalFilter, setGlobalFilter] = React.useState("");
-  const [selectedItem, setSelectedItem] = React.useState<z.infer<
-    typeof schema
-  > | null>(null);
+  const [selectedItem, setSelectedItem] = React.useState<IShop | null>(null);
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -178,15 +178,34 @@ export function DataTable() {
     [rowSelection],
   );
 
-  const deleteSelectedShops = React.useCallback(() => {
+  const deleteSelectedShops = React.useCallback(async () => {
     if (!selectedShopIds.length) {
       return;
     }
 
     const selectedSet = new Set(selectedShopIds);
+    const selectedShops = shops.filter((shop) => selectedSet.has(shop.id));
+
+    const results = await Promise.allSettled(
+      selectedShops.map(async (shop) => {
+        await deleteShopInAppwrite({
+          appwriteDocumentId: shop.appwriteDocumentId,
+          appwriteUserId: shop.appwriteUserId,
+          email: shop.email,
+        });
+        await purgeShopRelatedLocalData(shop);
+      }),
+    );
+
     const remainingShops = shops.filter((shop) => !selectedSet.has(shop.id));
     setShops(remainingShops);
     setRowSelection({});
+    const failed = results.filter((result) => result.status === "rejected").length;
+    if (failed > 0) {
+      toast.error(`${failed} shop(s) failed to delete fully.`);
+    } else {
+      toast.success("Selected shops deleted.");
+    }
     toast.dismiss("selected-shops-toast");
   }, [selectedShopIds, setShops, shops]);
 
@@ -245,7 +264,7 @@ export function DataTable() {
   }, [handleCancelDelete, deleteSelectedShops, selectedShopIds]);
 
   const matchesSearch = React.useCallback(
-    (shop: z.infer<typeof schema>) => {
+    (shop: IShop) => {
       if (!searchValue) {
         return true;
       }
@@ -274,7 +293,7 @@ export function DataTable() {
     [shops, matchesSearch, referenceDate],
   );
 
-  const shopOwnerSearchFilter: FilterFn<z.infer<typeof schema>> = (
+  const shopOwnerSearchFilter: FilterFn<IShop> = (
     row,
     _columnId,
     filterValue,
@@ -290,12 +309,12 @@ export function DataTable() {
     );
   };
 
-  const handleOpen = React.useCallback((item: z.infer<typeof schema>) => {
+  const handleOpen = React.useCallback((item: IShop) => {
     setSelectedItem(item);
     setOpen(true);
   }, []);
 
-  const formatAddedDate = React.useCallback((shop: z.infer<typeof schema>) => {
+  const formatAddedDate = React.useCallback((shop: IShop) => {
     const rawDate = shop.createdAt ?? new Date(shop.id).toISOString();
     const parsed = new Date(rawDate);
 
@@ -310,7 +329,7 @@ export function DataTable() {
     });
   }, []);
 
-  const columns = React.useMemo<ColumnDef<z.infer<typeof schema>>[]>(
+  const columns = React.useMemo<ColumnDef<IShop>[]>(
     () => [
       {
         id: "drag",
@@ -457,7 +476,7 @@ export function DataTable() {
     }
   }
 
-  const renderFilteredTable = (filteredShops: z.infer<typeof schema>[]) => {
+  const renderFilteredTable = (filteredShops: IShop[]) => {
     const filteredIds = filteredShops.map((shop) => shop.id.toString());
     const filteredDndIds = filteredShops.map((shop) => shop.id);
     const allFilteredSelected =
@@ -900,7 +919,7 @@ function ShopDrawer({
   onOpenChange,
   referenceDate,
 }: {
-  item: z.infer<typeof schema>;
+  item: IShop;
   open: boolean;
   onOpenChange: (value: boolean) => void;
   referenceDate: Date;

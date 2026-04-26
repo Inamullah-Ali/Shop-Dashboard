@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useProductStore } from "@/store/product-store";
+import { usePublicCommerceStore } from "@/store/public-commerce-store";
 import { useShopOpsStore } from "@/store/shop-ops-store";
 import type { PaymentMethod } from "@/types/shop-ops";
 
@@ -41,6 +42,7 @@ export function ShopDashboard() {
   const navigate = useNavigate();
   const { products } = useProductStore();
   const { sales, customers } = useShopOpsStore();
+  const { notifications } = usePublicCommerceStore();
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("Cash");
 
@@ -59,6 +61,14 @@ export function ShopDashboard() {
   const scopedCustomers = useMemo(
     () => customers.filter((customer) => customer.ownerEmail === ownerEmail),
     [customers, ownerEmail]
+  );
+
+  const scopedOrderRows = useMemo(
+    () =>
+      notifications
+        .filter((notification) => notification.ownerEmail === ownerEmail)
+        .flatMap((notification) => notification.items),
+    [notifications, ownerEmail]
   );
 
   const now = new Date();
@@ -99,10 +109,10 @@ export function ShopDashboard() {
     return points;
   }, [now, scopedSales]);
 
-  const lowStockProducts = useMemo(
-    () => scopedProducts.filter((product) => product.quantity <= 5).sort((a, b) => a.quantity - b.quantity),
-    [scopedProducts]
-  );
+  const totalOrders = scopedOrderRows.length;
+  const processingOrders = scopedOrderRows.filter((line) => line.status === "Processing").length;
+  const deliveredOrders = scopedOrderRows.filter((line) => line.status === "Delivered").length;
+  const cancelledOrders = scopedOrderRows.filter((line) => line.status === "Cancelled").length;
 
   const recentSales = useMemo(() => scopedSales.slice(0, 6), [scopedSales]);
 
@@ -185,20 +195,29 @@ export function ShopDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Low Stock Alert</CardTitle>
-            <CardDescription>Products with quantity 5 or less</CardDescription>
+            <CardTitle>Orders</CardTitle>
+            <CardDescription>Total orders</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {lowStockProducts.length ? (
-              lowStockProducts.slice(0, 6).map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                  <span className="truncate pr-2">{item.productName}</span>
-                  <span className="font-semibold text-red-500">{item.quantity}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">No low stock products.</p>
-            )}
+          <CardContent className="space-y-3">
+            <div className="rounded-md border p-3 text-sm">
+              <p>Total Orders: {totalOrders}</p>
+              <p>Delivered / Successful: {deliveredOrders}</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-md border p-2 text-center text-sm">
+                <p className="text-xs text-muted-foreground">Processing</p>
+                <p className="text-base font-semibold">{processingOrders}</p>
+              </div>
+              <div className="rounded-md border p-2 text-center text-sm">
+                <p className="text-xs text-muted-foreground">Successful</p>
+                <p className="text-base font-semibold">{deliveredOrders}</p>
+              </div>
+              <div className="rounded-md border p-2 text-center text-sm">
+                <p className="text-xs text-muted-foreground">Cancelled</p>
+                <p className="text-base font-semibold">{cancelledOrders}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -29,10 +29,15 @@ import { useShopStore } from "@/store/shop-store";
 import type { PackageDuration } from "@/types/tabledata";
 import { usePlanStore } from "@/store/addPlanStore";
 import { editShopSchema, type EditShopFormData } from "./shop-dialog-schema";
+import { replaceImageInAppwrite } from "@/service/appwriteStorage";
+import { toast } from "sonner";
+import { updateShopInAppwrite } from "@/service/appwriteShop";
 
 type Props = {
   rowData?: Omit<EditShopFormData, "selectedPlanId" | "status"> & {
     id: number;
+    appwriteDocumentId?: string;
+    appwriteUserId?: string;
     image?: string;
     packageDuration?: PackageDuration;
     selectedPlanId?: number;
@@ -93,34 +98,52 @@ export function EditDialogue({ rowData, trigger }: Props) {
     setSelectedImage(null);
   }, [plans, reset, rowData]);
 
-  const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read image file"));
-      reader.readAsDataURL(file);
-    });
-
   const onSubmit = async (data: EditShopFormData) => {
-    const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
-    if (!selectedPlan) {
-      return;
+    try {
+      const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
+      if (!selectedPlan) {
+        return;
+      }
+
+      const image = selectedImage
+        ? await replaceImageInAppwrite(selectedImage, rowData?.image)
+        : rowData?.image;
+
+      const appwriteRecord = await updateShopInAppwrite({
+        appwriteDocumentId: rowData?.appwriteDocumentId,
+        appwriteUserId: rowData?.appwriteUserId,
+        email: data.email,
+        updates: {
+          shopName: data.shopName,
+          ownerName: data.ownerName,
+          phoneNumber: data.phoneNumber,
+          shopAddress: data.shopAddress,
+          city: data.city,
+          shopType: data.shopType,
+          selectedPlanId: selectedPlan.id,
+          selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
+          selectedPlanPrice: selectedPlan.price,
+          packageDuration: selectedPlan.durationLabel,
+          status: data.status,
+          image,
+        },
+      });
+
+      editShop(rowData!.id, {
+        ...data,
+        appwriteDocumentId: appwriteRecord?.appwriteDocumentId ?? rowData?.appwriteDocumentId,
+        appwriteUserId: appwriteRecord?.appwriteUserId ?? rowData?.appwriteUserId,
+        selectedPlanId: selectedPlan.id,
+        selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
+        selectedPlanPrice: selectedPlan.price,
+        packageDuration: selectedPlan.durationLabel,
+        status: data.status,
+        image,
+      });
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update shop");
     }
-
-    const image = selectedImage
-      ? await fileToDataUrl(selectedImage)
-      : rowData?.image;
-
-    editShop(rowData!.id, {
-      ...data,
-      selectedPlanId: selectedPlan.id,
-      selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
-      selectedPlanPrice: selectedPlan.price,
-      packageDuration: selectedPlan.durationLabel,
-      status: data.status,
-      image,
-    });
-    setOpen(false);
   };
 
   return (

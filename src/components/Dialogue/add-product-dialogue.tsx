@@ -14,17 +14,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 type ProductFormValues = {
   productName: string;
-  productImage?: string;
+  productImageFile?: File;
   price: number;
   quantity: number;
   discount: number;
 };
 
 type AddProductDialogueProps = {
-  onAddProduct: (values: ProductFormValues) => void;
+  onAddProduct: (values: ProductFormValues) => void | Promise<void>;
 };
 
 type ProductFormState = {
@@ -55,14 +56,6 @@ export function AddProductDialogue({ onAddProduct }: AddProductDialogueProps) {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read image file"));
-      reader.readAsDataURL(file);
-    });
-
   const resetForm = () => {
     setForm(initialFormState);
     setSelectedImage(null);
@@ -76,21 +69,24 @@ export function AddProductDialogue({ onAddProduct }: AddProductDialogueProps) {
       return;
     }
 
-    const image = selectedImage ? await fileToDataUrl(selectedImage) : undefined;
     const price = parseNonNegativeNumber(form.price);
     const quantity = Math.trunc(parseNonNegativeNumber(form.quantity));
     const discount = parseNonNegativeNumber(form.discount);
 
-    onAddProduct({
-      productName: form.productName,
-      productImage: image,
-      price,
-      quantity,
-      discount,
-    });
+    try {
+      await onAddProduct({
+        productName: form.productName,
+        productImageFile: selectedImage ?? undefined,
+        price,
+        quantity,
+        discount,
+      });
 
-    resetForm();
-    setOpen(false);
+      resetForm();
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to add product");
+    }
   };
 
   return (

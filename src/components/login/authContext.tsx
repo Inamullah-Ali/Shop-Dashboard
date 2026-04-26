@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { UserRole } from "@/types/tabledata";
+import { signOutMainAdminFromAppwrite } from "@/service/appwriteAuth";
 
-type AuthUser = {
+export type AuthUser = {
   name: string;
   email: string;
   role: UserRole;
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    void signOutMainAdminFromAppwrite();
     localStorage.removeItem("auth-user");
     localStorage.removeItem("admin");
     setUser(null);

@@ -21,7 +21,7 @@ import { planSchema, type PlanFormData } from "./plan-form-schema";
 
 type EditPlanDialogueProps = {
   plan: PlanRow;
-  onUpdatePlan: (planId: number, values: PlanFormData) => void;
+  onUpdatePlan: (planId: number, values: PlanFormData) => void | Promise<void>;
 };
 
 export function EditPlanDialogue({ plan, onUpdatePlan }: EditPlanDialogueProps) {
@@ -53,8 +53,8 @@ export function EditPlanDialogue({ plan, onUpdatePlan }: EditPlanDialogueProps) 
     });
   }, [open, plan, reset]);
 
-  const onSubmit = (values: PlanFormData) => {
-    onUpdatePlan(plan.id, values);
+  const onSubmit = async (values: PlanFormData) => {
+    await onUpdatePlan(plan.id, values);
     setOpen(false);
   };
 

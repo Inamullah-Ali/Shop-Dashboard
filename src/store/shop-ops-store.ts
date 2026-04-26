@@ -20,6 +20,7 @@ const normalizeSale = (sale: SaleEntry): SaleEntry => ({
   quantity: Number.isFinite(sale.quantity) && sale.quantity > 0 ? Math.trunc(sale.quantity) : 1,
   amount: Number.isFinite(sale.amount) && sale.amount >= 0 ? sale.amount : 0,
   paymentMethod: sale.paymentMethod,
+  sourceOrderLineId: sale.sourceOrderLineId?.trim() || undefined,
 });
 
 const normalizeCredit = (credit: CreditEntry): CreditEntry => ({
@@ -80,6 +81,19 @@ export const useShopOpsStore = create<ShopOpsState>()(
 
           return {
             sales: [nextSale, ...state.sales],
+          };
+        }),
+
+      removeSaleBySourceLineId: (lineId) =>
+        set((state) => {
+          const normalizedLineId = lineId.trim();
+
+          if (!normalizedLineId) {
+            return state;
+          }
+
+          return {
+            sales: state.sales.filter((sale) => sale.sourceOrderLineId !== normalizedLineId),
           };
         }),
 

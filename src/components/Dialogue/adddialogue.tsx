@@ -26,6 +26,9 @@ import { useState } from "react";
 import { useShopStore } from "@/store/shop-store";
 import { usePlanStore } from "@/store/addPlanStore";
 import { addShopSchema, type AddShopFormData } from "./shop-dialog-schema";
+import { uploadImageToAppwrite } from "@/service/appwriteStorage";
+import { toast } from "sonner";
+import { createShopInAppwrite } from "@/service/appwriteShop";
 
 export function AddDialogue() {
   const [open, setOpen] = useState(false);
@@ -47,37 +50,37 @@ export function AddDialogue() {
     },
   });
 
-  const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read image file"));
-      reader.readAsDataURL(file);
-    });
-
   const onSubmit = async (data: AddShopFormData) => {
-    const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
-    if (!selectedPlan) {
-      return;
+    try {
+      const selectedPlan = plans.find((plan) => plan.id === data.selectedPlanId);
+      if (!selectedPlan) {
+        toast.error("Plan is required.");
+        return;
+      }
+
+      const uploadedImage = selectedImage
+        ? await uploadImageToAppwrite(selectedImage)
+        : null;
+
+      const createdShop = await createShopInAppwrite({
+        ...data,
+        selectedPlanId: selectedPlan.id,
+        selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
+        selectedPlanPrice: selectedPlan.price,
+        packageDuration: selectedPlan.durationLabel,
+        status: "Inactive",
+        image: uploadedImage?.fileUrl,
+      });
+
+      addShop(createdShop);
+      toast.success("Shop and Shop Admin account created successfully.");
+      reset();
+      setSelectedImage(null);
+      setPreview(null);
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to add shop");
     }
-
-    const image = selectedImage
-      ? await fileToDataUrl(selectedImage)
-      : undefined;
-
-    addShop({
-      ...data,
-      role: "shopAdmin",
-      selectedPlanId: selectedPlan.id,
-      selectedPlanName: `${selectedPlan.durationMonths} ${selectedPlan.planName}`,
-      selectedPlanPrice: selectedPlan.price,
-      packageDuration: selectedPlan.durationLabel,
-      status: "Inactive",
-      image,
-    });
-    reset();
-    setSelectedImage(null);
-    setOpen(false);
   };
 
   return (
@@ -94,7 +97,7 @@ export function AddDialogue() {
           <DialogHeader>
             <DialogTitle>Add Shop</DialogTitle>
             <DialogDescription>
-              Fill all required fields. Missing fields will show errors.
+              Fill all required fields. Only image is optional.
             </DialogDescription>
           </DialogHeader>
 
@@ -211,7 +214,7 @@ export function AddDialogue() {
                 name="selectedPlanId"
                 render={({ field }) => (
                   <Select
-                    value={field.value ? String(field.value) : undefined}
+                    value={field.value ? String(field.value) : ""}
                     onValueChange={(value) => field.onChange(Number(value))}
                   >
                     <SelectTrigger className="cursor-pointer">

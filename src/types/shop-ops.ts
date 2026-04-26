@@ -9,6 +9,7 @@ export type SaleEntry = {
   quantity: number;
   amount: number;
   paymentMethod: PaymentMethod;
+  sourceOrderLineId?: string;
 };
 
 export type CreditEntry = {
@@ -61,6 +62,7 @@ export interface ShopOpsState {
   purchases: PurchaseEntry[];
   expenses: ExpenseEntry[];
   addSale: (sale: Omit<SaleEntry, "id" | "createdAt">) => void;
+  removeSaleBySourceLineId: (lineId: string) => void;
   addCredit: (credit: Omit<CreditEntry, "id" | "createdAt">) => void;
   updateCredit: (id: number, updates: Partial<CreditEntry>) => void;
   deleteCredit: (id: number) => void;

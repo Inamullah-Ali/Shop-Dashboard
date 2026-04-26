@@ -14,28 +14,75 @@ import { AddPlanDialogue } from "@/components/Dialogue/add-plan-dialogue";
 import { EditPlanDialogue } from "@/components/Dialogue/edit-plan-dialogue";
 import type { PlanFormData } from "@/components/Dialogue/plan-form-schema";
 import { DeletePlan } from "@/components/Dialogue/deleteplan";
+import { toast } from "sonner";
+import {
+  createPlanInAppwrite,
+  deletePlanInAppwrite,
+  updatePlanInAppwrite,
+} from "@/service/appwritePlan";
 
 export default function Plans() {
-  const { plans, addPlan, updatePlan } = usePlanStore();
+  const { plans, addPlan, updatePlan, deletePlan } = usePlanStore();
   const { editShop, shops } = useShopStore();
 
-  const onAddPlan = (values: PlanFormData) => {
-    addPlan(values);
+  const onAddPlan = async (values: PlanFormData) => {
+    try {
+      const createdPlan = await createPlanInAppwrite(values);
+      addPlan(createdPlan);
+      toast.success("Plan saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save plan");
+      throw error;
+    }
   };
 
-  const onUpdatePlan = (planId: number, values: PlanFormData) => {
-    updatePlan(planId, values);
+  const onUpdatePlan = async (planId: number, values: PlanFormData) => {
+    try {
+      const existingPlan = plans.find((plan) => plan.id === planId);
 
-    const updatedDurationLabel = formatPlanDurationLabel(values.planName, values.durationMonths);
-    shops
-      .filter((shop) => shop.selectedPlanId === planId)
-      .forEach((shop) => {
-        editShop(shop.id, {
-          selectedPlanName: `${values.durationMonths} ${values.planName}`,
-          selectedPlanPrice: values.price,
-          packageDuration: updatedDurationLabel,
-        });
+      if (!existingPlan) {
+        toast.error("Plan not found.");
+        return;
+      }
+
+      const updatedPlan = await updatePlanInAppwrite({
+        appwriteDocumentId: existingPlan.appwriteDocumentId,
+        ...values,
       });
+
+      updatePlan(planId, updatedPlan);
+
+      const updatedDurationLabel = formatPlanDurationLabel(values.planName, values.durationMonths);
+      shops
+        .filter((shop) => shop.selectedPlanId === planId)
+        .forEach((shop) => {
+          editShop(shop.id, {
+            selectedPlanName: `${values.durationMonths} ${values.planName}`,
+            selectedPlanPrice: values.price,
+            packageDuration: updatedDurationLabel,
+          });
+        });
+
+      toast.success("Plan updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update plan");
+      throw error;
+    }
+  };
+
+  const onDeletePlan = async (rowData: {
+    id: number;
+    appwriteDocumentId?: string;
+    shopName: string;
+  }) => {
+    try {
+      await deletePlanInAppwrite(rowData.appwriteDocumentId);
+      deletePlan(rowData.id);
+      toast.success("Plan deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete plan");
+      throw error;
+    }
   };
 
   return (
@@ -74,7 +121,14 @@ export default function Plans() {
                       <TableCell>
                         <div className="flex justify-end gap-2">
                           <EditPlanDialogue plan={plan} onUpdatePlan={onUpdatePlan} />
-                          <DeletePlan rowData={{ id: plan.id, shopName: plan.planName }} />
+                          <DeletePlan
+                            rowData={{
+                              id: plan.id,
+                              appwriteDocumentId: plan.appwriteDocumentId,
+                              shopName: plan.planName,
+                            }}
+                            onDeletePlan={onDeletePlan}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

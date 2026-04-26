@@ -8,8 +8,8 @@ import { formatPlanDurationLabel } from "@/lib/plan-utils";
 type PlanState = {
   plans: PlanRow[];
   setPlans: (plans: PlanRow[]) => void;
-  addPlan: (plan: { planName: string; durationMonths: number; price: number }) => void;
-  updatePlan: (id: number, plan: { planName: string; durationMonths: number; price: number }) => void;
+  addPlan: (plan: PlanRow) => void;
+  updatePlan: (id: number, plan: Partial<PlanRow>) => void;
   deletePlan: (id: number) => void;
 };
 
@@ -30,8 +30,6 @@ export const usePlanStore = create<PlanState>()(
 
       addPlan: (plan) =>
         set((state) => {
-          const now = new Date().toISOString();
-          const durationLabel = formatPlanDurationLabel(plan.planName, plan.durationMonths);
           const existing = state.plans.find(
             (row) =>
               row.planName.toLowerCase() === plan.planName.toLowerCase() &&
@@ -44,11 +42,7 @@ export const usePlanStore = create<PlanState>()(
                 row.id === existing.id
                   ? {
                       ...row,
-                      planName: plan.planName,
-                      durationMonths: plan.durationMonths,
-                      durationLabel,
-                      price: plan.price,
-                      updatedAt: now,
+                      ...plan,
                     }
                   : row,
               ),
@@ -56,35 +50,18 @@ export const usePlanStore = create<PlanState>()(
           }
 
           return {
-            plans: [
-              ...state.plans,
-              {
-                id: Date.now(),
-                planName: plan.planName,
-                durationMonths: plan.durationMonths,
-                durationLabel,
-                price: plan.price,
-                updatedAt: now,
-              },
-            ],
+            plans: [...state.plans, plan],
           };
         }),
 
       updatePlan: (id, plan) =>
         set((state) => {
-          const now = new Date().toISOString();
-          const durationLabel = formatPlanDurationLabel(plan.planName, plan.durationMonths);
-
           return {
             plans: state.plans.map((row) =>
               row.id === id
                 ? {
                     ...row,
-                    planName: plan.planName,
-                    durationMonths: plan.durationMonths,
-                    durationLabel,
-                    price: plan.price,
-                    updatedAt: now,
+                    ...plan,
                   }
                 : row,
             ),
@@ -138,6 +115,7 @@ export const usePlanStore = create<PlanState>()(
             return {
               ...plan,
               durationMonths,
+              appwriteDocumentId: plan.appwriteDocumentId,
               durationLabel:
                 normalizedLabel.match(/^\d+\s*year(s)?$/i)
                   ? `${durationMonths} year${durationMonths > 1 ? "s" : ""}`

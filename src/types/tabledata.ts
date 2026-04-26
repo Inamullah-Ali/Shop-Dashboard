@@ -1,12 +1,14 @@
 export type PackageDuration = string;
 
-export type UserRole = "admin" | "shopAdmin";
+export type UserRole = "admin" | "shopAdmin" | "customer";
 
 export type IShop = {
   id: number;
   createdAt?: string;
   paymentStatus?: "Received" | "Not Received";
   paymentDate?: string;
+  appwriteDocumentId?: string;
+  appwriteUserId?: string;
   selectedPlanId?: number;
   selectedPlanName?: string;
   selectedPlanPrice?: number;

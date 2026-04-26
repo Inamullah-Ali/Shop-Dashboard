@@ -15,7 +15,7 @@ import {
 
 type DeleteProductDialogueProps = {
   productName: string;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
 };
 
 export function DeleteProductDialogue({ productName, onDelete }: DeleteProductDialogueProps) {
@@ -46,8 +46,8 @@ export function DeleteProductDialogue({ productName, onDelete }: DeleteProductDi
           <Button
             type="button"
             className="cursor-pointer bg-red-500 hover:bg-red-600"
-            onClick={() => {
-              onDelete();
+            onClick={async () => {
+              await onDelete();
               setOpen(false);
             }}
           >

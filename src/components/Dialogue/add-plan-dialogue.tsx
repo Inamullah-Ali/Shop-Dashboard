@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { planSchema, type PlanFormData } from "./plan-form-schema";
 
 type AddPlanDialogueProps = {
-  onAddPlan: (values: PlanFormData) => void;
+  onAddPlan: (values: PlanFormData) => void | Promise<void>;
 };
 
 export function AddPlanDialogue({ onAddPlan }: AddPlanDialogueProps) {
@@ -39,8 +39,8 @@ export function AddPlanDialogue({ onAddPlan }: AddPlanDialogueProps) {
     },
   });
 
-  const onSubmit = (values: PlanFormData) => {
-    onAddPlan(values);
+  const onSubmit = async (values: PlanFormData) => {
+    await onAddPlan(values);
     reset({
       planName: "",
       durationMonths: 1,

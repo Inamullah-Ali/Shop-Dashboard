@@ -12,21 +12,38 @@ import {
 import { useShopStore } from "@/store/shop-store";
 import { Trash2, } from "lucide-react"
 import { useState } from "react";
+import { toast } from "sonner";
+import type { IShop } from "@/types/tabledata";
+import { purgeShopRelatedLocalData } from "@/service/shop-cascade";
+import { deleteShopInAppwrite } from "@/service/appwriteShop";
 
 type Props = {
-  rowData: {
-    id: number;
-    shopName: string;
-  };
+  rowData: IShop;
 };
 
 export function DeleteDialogue({ rowData }: Props) {
   const [open, setOpen] = useState(false);
   const { deleteShop } = useShopStore();
 
-  const handleDelete = () => {
-    deleteShop(rowData.id);
-    setOpen(false);
+  const handleDelete = async () => {
+    try {
+      const result = await deleteShopInAppwrite({
+        appwriteDocumentId: rowData.appwriteDocumentId,
+        appwriteUserId: rowData.appwriteUserId,
+        email: rowData.email,
+      });
+
+      await purgeShopRelatedLocalData(rowData);
+      deleteShop(rowData.id);
+      setOpen(false);
+      if (result.accountDeleted) {
+        toast.success("Shop and Shop Admin account deleted.");
+      } else {
+        toast.success("Shop deleted. Configure Shop Admin delete endpoint to remove Appwrite user account.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete shop");
+    }
   };
 
   return (
@@ -50,7 +67,7 @@ export function DeleteDialogue({ rowData }: Props) {
             <Button
               className="bg-red-500 cursor-pointer"
               type="button"
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
             >
               Delete
             </Button>

@@ -15,10 +15,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Product } from "@/types/product";
+import { toast } from "sonner";
 
 type ProductFormValues = {
   productName: string;
-  productImage?: string;
+  productImageFile?: File;
   price: number;
   quantity: number;
   discount: number;
@@ -26,7 +27,7 @@ type ProductFormValues = {
 
 type EditProductDialogueProps = {
   product: Product;
-  onUpdateProduct: (id: number, values: ProductFormValues) => void;
+  onUpdateProduct: (id: number, values: ProductFormValues) => void | Promise<void>;
 };
 
 type ProductFormState = {
@@ -70,34 +71,29 @@ export function EditProductDialogue({ product, onUpdateProduct }: EditProductDia
     setPreview(product.productImage ?? null);
   }, [open, product]);
 
-  const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read image file"));
-      reader.readAsDataURL(file);
-    });
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.productName.trim()) {
       return;
     }
 
-    const image = selectedImage ? await fileToDataUrl(selectedImage) : product.productImage;
     const price = parseNonNegativeNumber(form.price);
     const quantity = Math.trunc(parseNonNegativeNumber(form.quantity));
     const discount = parseNonNegativeNumber(form.discount);
 
-    onUpdateProduct(product.id, {
-      productName: form.productName,
-      productImage: image,
-      price,
-      quantity,
-      discount,
-    });
+    try {
+      await onUpdateProduct(product.id, {
+        productName: form.productName,
+        productImageFile: selectedImage ?? undefined,
+        price,
+        quantity,
+        discount,
+      });
 
-    setOpen(false);
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update product");
+    }
   };
 
   return (

@@ -28,6 +28,7 @@ import {
   ShoppingCartIcon,
   HandCoinsIcon,
   ReceiptTextIcon,
+  ClipboardListIcon,
 } from "lucide-react"
 import { ThemeSwitch } from "./themeswitcher"
 import { useAuth } from "./login/authContext"
@@ -103,6 +104,12 @@ const data = {
       title: "Credit",
       url: "/credit",
       icon: <CreditCardIcon />,
+      roles: ["shopAdmin"] as UserRole[],
+    },
+    {
+      title: "Orders",
+      url: "/orders",
+      icon: <ClipboardListIcon />,
       roles: ["shopAdmin"] as UserRole[],
     },
     {

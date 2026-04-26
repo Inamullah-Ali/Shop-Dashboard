@@ -16,12 +16,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AddProductDialogue } from "@/components/Dialogue/add-product-dialogue";
 import { EditProductDialogue } from "@/components/Dialogue/edit-product-dialogue";
 import { DeleteProductDialogue } from "@/components/Dialogue/delete-product-dialogue";
+import {
+  deleteImageFromAppwrite,
+  replaceImageInAppwrite,
+  uploadImageToAppwrite,
+} from "@/service/appwriteStorage";
+import {
+  createProductInAppwrite,
+  deleteProductInAppwrite,
+  updateProductInAppwrite,
+} from "@/service/appwriteProduct";
 import { useProductStore } from "@/store/product-store";
 import { AlertTriangle } from "lucide-react";
 
 type ProductFormValues = {
   productName: string;
-  productImage?: string;
+  productImageFile?: File;
   price: number;
   quantity: number;
   discount: number;
@@ -31,7 +41,7 @@ const BULK_DELETE_TOAST_ID = "bulk-delete-products-confirmation";
 
 export default function Products() {
   const { user } = useAuth();
-  const { products, addProduct, updateProduct, deleteProduct } = useProductStore();
+  const { products, setProducts } = useProductStore();
   const isAdmin = user?.role === "admin";
 
   const [search, setSearch] = useState("");
@@ -116,14 +126,46 @@ export default function Products() {
     [products, selectedRows],
   );
 
-  const handleDeleteSelectedProducts = useCallback(() => {
+  const handleDeleteSelectedProducts = useCallback(async () => {
     if (!selectedProductIds.length) {
       return;
     }
 
-    selectedProductIds.forEach((id) => {
-      deleteProduct(id);
-    });
+    const selectedProducts = products.filter((product) =>
+      selectedProductIds.includes(product.id),
+    );
+
+    const deleteProductResults = await Promise.allSettled(
+      selectedProducts.map((product) =>
+        deleteProductInAppwrite({
+          appwriteDocumentId: product.appwriteDocumentId,
+          ownerEmail: product.ownerEmail,
+          productName: product.productName,
+        }),
+      ),
+    );
+
+    const failedProductDelete = deleteProductResults.find((result) => result.status === "rejected");
+    if (failedProductDelete?.status === "rejected") {
+      toast.error(
+        failedProductDelete.reason instanceof Error
+          ? failedProductDelete.reason.message
+          : "Failed to remove one or more products from Appwrite",
+      );
+      return;
+    }
+
+    const deleteResults = await Promise.allSettled(
+      selectedProducts.map((product) => deleteImageFromAppwrite(product.productImage)),
+    );
+
+    const failedDelete = deleteResults.find((result) => result.status === "rejected");
+    if (failedDelete?.status === "rejected") {
+      toast.error(failedDelete.reason instanceof Error ? failedDelete.reason.message : "Failed to remove one or more product images from Appwrite");
+      return;
+    }
+
+    setProducts(products.filter((product) => !selectedProductIds.includes(product.id)));
 
     setSelectedRows((previous) => {
       const next = { ...previous };
@@ -134,7 +176,7 @@ export default function Products() {
     });
 
     toast.dismiss(BULK_DELETE_TOAST_ID);
-  }, [deleteProduct, selectedProductIds]);
+  }, [products, selectedProductIds, setProducts]);
 
   const handleCancelDelete = useCallback(() => {
     setSelectedRows({});
@@ -192,27 +234,77 @@ export default function Products() {
     };
   }, []);
 
-  const handleAddProduct = (values: ProductFormValues) => {
+  const handleAddProduct = async (values: ProductFormValues) => {
     if (!user) {
       return;
     }
 
-    addProduct({
+    let uploadedImage = null;
+    if (values.productImageFile) {
+      uploadedImage = await uploadImageToAppwrite(values.productImageFile);
+    }
+
+    const createdProduct = await createProductInAppwrite({
       ownerEmail: user.email,
       ownerName: user.name,
-      ...values,
+      productImage: uploadedImage?.fileUrl,
+      productName: values.productName,
+      price: values.price,
+      quantity: values.quantity,
+      discount: values.discount,
     });
+
+    setProducts([createdProduct, ...products]);
+
+    toast.success("Product saved");
   };
 
-  const handleUpdateProduct = (id: number, values: ProductFormValues) => {
-    updateProduct(id, values);
+  const handleUpdateProduct = async (id: number, values: ProductFormValues) => {
+    const existingProduct = products.find((product) => product.id === id);
+
+    if (!existingProduct) {
+      return;
+    }
+
+    const nextImageUrl = values.productImageFile
+      ? await replaceImageInAppwrite(values.productImageFile, existingProduct.productImage)
+      : existingProduct.productImage;
+
+    const updatedProduct = await updateProductInAppwrite({
+      appwriteDocumentId: existingProduct.appwriteDocumentId,
+      ownerEmail: existingProduct.ownerEmail,
+      productName: existingProduct.productName,
+      updates: {
+        productImage: nextImageUrl,
+        productName: values.productName,
+        price: values.price,
+        quantity: values.quantity,
+        discount: values.discount,
+      },
+    });
+
+    setProducts(products.map((product) => (product.id === id ? updatedProduct : product)));
+
+    toast.success("Product updated");
   };
-  
-  useEffect(() => {
-    return () => {
-      toast.dismiss(BULK_DELETE_TOAST_ID);
-    };
-  }, []);
+
+  const handleDeleteProduct = async (id: number) => {
+    const existingProduct = products.find((product) => product.id === id);
+
+    if (!existingProduct) {
+      return;
+    }
+
+    await deleteProductInAppwrite({
+      appwriteDocumentId: existingProduct.appwriteDocumentId,
+      ownerEmail: existingProduct.ownerEmail,
+      productName: existingProduct.productName,
+    });
+
+    await deleteImageFromAppwrite(existingProduct.productImage);
+    setProducts(products.filter((product) => product.id !== id));
+    toast.success("Product deleted");
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -301,7 +393,7 @@ export default function Products() {
                           />
                           <DeleteProductDialogue
                             productName={product.productName}
-                            onDelete={() => deleteProduct(product.id)}
+                            onDelete={() => handleDeleteProduct(product.id)}
                           />
                         </div>
                       </TableCell>

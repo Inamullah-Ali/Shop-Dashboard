@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { useProductStore } from "@/store/product-store";
 import { useShopOpsStore } from "@/store/shop-ops-store";
+import { updateProductInAppwrite } from "@/service/appwriteProduct";
 import type { Product } from "@/types/product";
 import type { PaymentMethod } from "@/types/shop-ops";
 import { toast } from "sonner";
@@ -326,7 +327,7 @@ export function NewSaleDialog({
     setOpen(false);
   };
 
-  const addNewSale = () => {
+  const addNewSale = async () => {
     if (!ownerEmail || !selectedSaleItems.length) {
       return;
     }
@@ -456,8 +457,8 @@ export function NewSaleDialog({
       }
     }
 
-    Object.entries(deductionByProduct).forEach(
-      ([productKey, totalQuantity]) => {
+    const inventoryUpdates = Object.entries(deductionByProduct).map(
+      async ([productKey, totalQuantity]) => {
         const productToUpdate = scopedProducts.find(
           (product) => product.productName.toLowerCase() === productKey,
         );
@@ -466,11 +467,33 @@ export function NewSaleDialog({
           return;
         }
 
+        const nextQuantity = Math.max(0, productToUpdate.quantity - totalQuantity);
+
+        await updateProductInAppwrite({
+          appwriteDocumentId: productToUpdate.appwriteDocumentId,
+          ownerEmail: productToUpdate.ownerEmail,
+          productName: productToUpdate.productName,
+          updates: {
+            productName: productToUpdate.productName,
+            productImage: productToUpdate.productImage,
+            price: productToUpdate.price,
+            quantity: nextQuantity,
+            discount: productToUpdate.discount,
+          },
+        });
+
         updateProduct(productToUpdate.id, {
-          quantity: Math.max(0, productToUpdate.quantity - totalQuantity),
+          quantity: nextQuantity,
         });
       },
     );
+
+    try {
+      await Promise.all(inventoryUpdates);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update product inventory in Appwrite");
+      return;
+    }
 
     resetSaleForm();
   };
